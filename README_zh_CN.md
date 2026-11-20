@@ -58,7 +58,14 @@ Web 管理端和 Go 后端需自行部署，参见下方的[从源码运行](#�
 
 ### 后端
 
-使用 PowerShell 复制配置模板：
+macOS 上复制配置模板。已有本地配置时跳过对应命令。
+
+```sh
+[ -e .env ] || cp .env.example .env
+[ -e backend/config/config.local.yaml ] || cp backend/config/config.example.yaml backend/config/config.local.yaml
+```
+
+Windows 上可用 PowerShell 的 `Copy-Item` 复制同一组模板。
 
 ```powershell
 Copy-Item .env.example .env
@@ -69,30 +76,46 @@ Copy-Item backend/config/config.example.yaml backend/config/config.local.yaml
 
 - 在根目录 `.env` 中填写 `MYSQL_PASSWORD`；Redis 启用认证时填写 `REDIS_PASSWORD`，否则留空。
 - 在 `backend/config/config.local.yaml` 中设置 MySQL 和 Redis 连接信息，确保两个服务均可连接。
+- 在可信私有网络内直连已有远端开发环境时，填写远端 MySQL 和 Redis 的主机与端口。后端当前未启用数据库连接 TLS，跨不可信网络时应使用加密 VPN 或 SSH 转发。
 - 设置当前环境独立的 `app.namespace`，会话有效期可沿用模板值。
 - 将 `app.package_dir` 设为本地 APK 目录，配置上传文件的 `storage.root_dir` 和 `storage.base_url`。上传文件通过 Nginx 等静态服务访问，目录与 URL 前缀需相互对应。
 
-按 [数据库说明](backend/database/README.md) 初始化独立的开发数据库。新数据库使用当前完整表结构和所需的 seed 数据，已有数据库使用增量迁移。初始化数据不提供默认管理员账号或固定密码。
+若需要新建或升级独立开发库，按 [数据库说明](backend/database/README.md) 初始化独立的开发数据库。新数据库使用当前完整表结构和所需的 seed 数据，已有数据库使用增量迁移。初始化数据不提供默认管理员账号或固定密码。
 
-```powershell
+```sh
 cd backend
 go mod download
 go run ./cmd/server
 ```
 
+需要热重载时，在 `backend/` 内执行 `air -c .air.toml`。两种启动方式使用相同的后端连接配置。
+
 模板使用 `8080` 端口和 `/api/v1` 前缀。可在另一个终端检查服务：
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/v1/health
+```sh
+curl -fsS http://127.0.0.1:8080/api/v1/health
 ```
+
+Windows PowerShell 可使用 `Invoke-RestMethod http://127.0.0.1:8080/api/v1/health`。
 
 App 请求还会校验客户端版本。联调前需准备与 `frontend/manifest.json` 对应的已发布版本数据，版本数据与 APK 的准备方式见 [发布说明](deploy/README.md)。
 
 ### Web 管理端
 
+macOS 终端
+
+```sh
+cd admin
+[ -e .env ] || cp .env.example .env
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+Windows PowerShell
+
 ```powershell
 cd admin
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 pnpm install --frozen-lockfile
 pnpm dev
 ```
@@ -103,13 +126,13 @@ pnpm dev
 
 ### Android 客户端
 
-1. 使用 HBuilderX 打开 `frontend/`。
+1. 使用 HBuilderX 打开 `frontend/`。如果编译器提示缺少 Dart Sass，安装 [Dart Sass 插件](https://ext.dcloud.net.cn/plugin?name=compile-dart-sass)。
 2. 检查 `frontend/utils/api.uts` 中的开发接口和头像地址。运行使用 development 配置，发行打包使用 production 配置。
 3. 连接并授权 Android 设备，通过 HBuilderX 运行客户端。
 
 USB 调试时，开发接口默认使用 `http://127.0.0.1:8080/api/v1`。ADB 可用且设备已授权后，配置后端端口反向转发：
 
-```powershell
+```sh
 adb reverse tcp:8080 tcp:8080
 ```
 
@@ -119,22 +142,24 @@ adb reverse tcp:8080 tcp:8080
 
 ### 可选开发脚本
 
-在项目根目录执行 `make phone`，可检查设备和本地服务并配置 USB 反向转发。需要 Make、Windows PowerShell 和 ADB；多设备时传入 `DEVICE_SERIAL=<设备序列号>`。
+在 macOS 上，可用 Homebrew 安装 Air（`brew install go-air`）和 ADB（`brew install --cask android-platform-tools`）。
 
-`make air` 会先建立连接远端 MySQL／Redis 的 SSH 隧道，再启动 Air 热重载。需要 Make、Air、OpenSSH、已验证的主机密钥及本机忽略的 `.private/dev-ssh.json` 配置，本地 MySQL／Redis 连接端口分别设为 `13306`／`16379`。确认目标环境和访问范围后再使用；纯本地开发使用 `go run ./cmd/server` 即可。
+在项目根目录执行 `make phone`，可检查设备和本地服务并配置 USB 反向转发。多设备时传入 `DEVICE_SERIAL=<设备序列号>`。macOS 可传入 `ADB_PATH=/path/to/adb`，Windows 需要 PowerShell。
+
+Windows 开发需要 SSH 隧道时，可在项目根目录运行 `make air`。配置详见 [SSH 隧道流程](deploy/README.md#windows-本地开发)。
 
 ## 检查
 
 在 `backend/` 中执行：
 
-```powershell
+```sh
 go test ./...
 go build ./...
 ```
 
 在 `admin/` 中执行：
 
-```powershell
+```sh
 pnpm typecheck
 pnpm exec oxlint
 pnpm exec eslint .

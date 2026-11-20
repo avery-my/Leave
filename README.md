@@ -58,7 +58,14 @@ Run each module in its own terminal. Start the commands below from the repositor
 
 ### Backend
 
-Copy the configuration templates with PowerShell:
+On macOS, copy the templates if the local files are missing.
+
+```sh
+[ -e .env ] || cp .env.example .env
+[ -e backend/config/config.local.yaml ] || cp backend/config/config.example.yaml backend/config/config.local.yaml
+```
+
+On Windows, use PowerShell’s `Copy-Item` for the same templates.
 
 ```powershell
 Copy-Item .env.example .env
@@ -69,30 +76,46 @@ Configure the following before starting:
 
 - Set `MYSQL_PASSWORD` in the root `.env`. Set `REDIS_PASSWORD` if Redis authentication is enabled; otherwise leave it empty.
 - Set the MySQL and Redis connection details in `backend/config/config.local.yaml`. Both services must be available.
+- For direct access to an existing remote development environment, use the remote MySQL and Redis hosts and ports on a trusted private network. The backend currently connects without TLS. If the connection crosses an untrusted network, use an encrypted VPN or SSH forwarding.
 - Use an environment-specific `app.namespace`. The session TTLs can use the template values.
 - Set `app.package_dir` to your APK directory, and configure `storage.root_dir` and `storage.base_url` for uploads. Serve uploaded files through a static server such as Nginx, using the matching directory and URL prefix.
 
-Initialize a separate development database using the [database guide](backend/database/README.md). New databases use the current table definitions and required seed data; existing databases use incremental migrations. No default admin account or password is provided.
+If you need to initialize or upgrade a separate development database, follow the [database guide](backend/database/README.md). New databases use the current table definitions and required seed data; existing databases use incremental migrations. No default admin account or password is provided.
 
-```powershell
+```sh
 cd backend
 go mod download
 go run ./cmd/server
 ```
 
+For hot reload, run `air -c .air.toml` from `backend/`. Both commands use the same backend connection settings.
+
 The template uses port `8080` and the `/api/v1` prefix. Check the service from another terminal:
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/v1/health
+```sh
+curl -fsS http://127.0.0.1:8080/api/v1/health
 ```
+
+In Windows PowerShell, use `Invoke-RestMethod http://127.0.0.1:8080/api/v1/health`.
 
 App requests also check the client version. Prepare published version data matching `frontend/manifest.json` before app integration; see the [release guide](deploy/README.md) for version data and APK preparation.
 
 ### Web admin
 
+macOS terminal
+
+```sh
+cd admin
+[ -e .env ] || cp .env.example .env
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+Windows PowerShell
+
 ```powershell
 cd admin
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 pnpm install --frozen-lockfile
 pnpm dev
 ```
@@ -103,13 +126,13 @@ See the [admin guide](admin/README.md) for environment configuration and additio
 
 ### Android app
 
-1. Open `frontend/` in HBuilderX.
+1. Open `frontend/` in HBuilderX. If requested by the compiler, install the [Dart Sass plugin](https://ext.dcloud.net.cn/plugin?name=compile-dart-sass).
 2. Check the development API and avatar URLs in `frontend/utils/api.uts`. Running uses the development configuration; release packaging uses the production configuration.
 3. Connect and authorize an Android device, then run the app from HBuilderX.
 
 For USB debugging, the development API defaults to `http://127.0.0.1:8080/api/v1`. With ADB available and the device authorized, forward the backend port:
 
-```powershell
+```sh
 adb reverse tcp:8080 tcp:8080
 ```
 
@@ -119,22 +142,24 @@ The app uses HBuilderX's uni-app x toolchain and has no npm/pnpm build command.
 
 ### Optional development helpers
 
-From the repository root, `make phone` checks the device and local services, then sets up USB forwarding. It requires Make, Windows PowerShell and ADB; for multiple devices, pass `DEVICE_SERIAL=<serial>`.
+On macOS, install Air and ADB with `brew install go-air` and `brew install --cask android-platform-tools`.
 
-`make air` starts SSH tunnels to remote MySQL/Redis, then launches Air for hot reload. It requires Make, Air, OpenSSH, a verified host key and the ignored local `.private/dev-ssh.json` configuration. Set local MySQL/Redis ports to `13306`/`16379` respectively. Use it only with the intended remote environment and access scope; local-only development can use `go run ./cmd/server`.
+From the repository root, `make phone` checks the device and local services, then sets up USB forwarding. For multiple devices, pass `DEVICE_SERIAL=<serial>`. macOS also accepts `ADB_PATH=/path/to/adb`. Windows requires PowerShell.
+
+Windows developers who need SSH tunnels can run `make air` from the repository root. See the [SSH tunnel setup](deploy/README.md#windows-本地开发).
 
 ## Checks
 
 In `backend/`:
 
-```powershell
+```sh
 go test ./...
 go build ./...
 ```
 
 In `admin/`:
 
-```powershell
+```sh
 pnpm typecheck
 pnpm exec oxlint
 pnpm exec eslint .

@@ -2,6 +2,12 @@
 
 项目仓库：[X-LMH/Leave](https://github.com/X-LMH/Leave)。构建与发布运行记录见 [GitHub Actions](https://github.com/X-LMH/Leave/actions)。
 
+## macOS 本地开发
+
+在 `backend/` 运行 `go run ./cmd/server`，或使用 `air -c .air.toml` 启动热重载。后端按 `config/config.local.yaml` 中的地址连接 MySQL 和 Redis，密码通过根目录 `.env` 提供。在可信私有网络内直连已有远端开发环境时，填写远端 MySQL 和 Redis 的主机与端口。后端当前未启用数据库连接 TLS，跨不可信网络时应使用加密 VPN 或 SSH 转发。首次启动可用 `curl -fsS http://127.0.0.1:8080/api/v1/health` 检查后端。
+
+Android 真机通过 USB 调试时，运行 `make phone` 将设备上的 8080 转发到本机后端。头像服务监听 8081 时也可一并转发。工具和配置步骤见[本地开发说明](../README_zh_CN.md#从源码运行)。
+
 ## Windows 本地开发
 
 如果本地开发需要连接远端 MySQL、Redis，可以在项目根目录运行 `make air`，自动建立连接并启动 Air；按 `Ctrl+C` 退出时自动清理连接。直接运行 Air 的方式仍可照常使用。
@@ -16,6 +22,8 @@
 ```
 
 密钥路径相对于项目根目录，首次连接前需核验服务器指纹；带口令的密钥需先加入 ssh-agent。本地 YAML 中 MySQL 使用 `127.0.0.1:13306`，Redis 使用 `127.0.0.1:16379`，账号密码和数据库按开发环境填写。端口已占用时不会启动；直接强杀终端可能无法清理连接。
+
+## 测试与生产
 
 测试与生产共用构建和发布流程，通过标签选择环境。App 继续由 HBuilderX 本地打包，后端和 admin 在 GitHub Runner 从标签对应的提交构建。日常发布保留服务器维护的配置、Nginx 和宝塔项目；首次生产 admin 建站见下文。
 
