@@ -29,6 +29,12 @@ tables/app_versions.sql
 - 查看当前表的完整结构；
 - 作为数据库结构的基线参考。
 
+#### 学生照片
+
+`profiles.avatar_path` 和 `profiles.photo_path` 保存相对于上传目录的文件路径，分别使用 `avatars/` 和 `photo/` 子目录。迁移 `000015` 将 `avatar_url` 重命名为 `avatar_path`，保留已有头像路径。部署时需同步切换后端的列映射和查询。
+
+`photo_path` 默认为 `NULL`，表示本人照片尚未导入。已有学生首次查看假条详情时，可根据申请人的 `records.student_id` 找到对应资料，缺少照片时触发补录。新学生首次完成个人资料后触发导入。照片文件保存成功后回填 `profiles.photo_path`，同一学生的假条共用该路径。外站登录凭据不写入这些业务表。
+
 ### `seed/`
 
 保存初始化数据、基础数据或测试数据，例如：
