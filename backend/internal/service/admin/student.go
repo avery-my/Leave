@@ -73,8 +73,8 @@ func (s *StudentService) studentResponse(user *models.User, profile *models.Prof
 			DormitoryNumber: profile.DormitoryNumber,
 			TeacherName:     profile.TeacherName,
 		}
-		if profile.AvatarURL != "" {
-			avatarPath = profile.AvatarURL
+		if profile.AvatarPath != "" {
+			avatarPath = profile.AvatarPath
 		}
 	}
 	url, err := file.AccessURL(s.storage.BaseURL, avatarPath)

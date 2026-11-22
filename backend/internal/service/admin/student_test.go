@@ -58,7 +58,7 @@ func TestStudentResponse(t *testing.T) {
 			TeacherName:     "老师",
 			ApartmentID:     3,
 			DormitoryNumber: "101",
-			AvatarURL:       "avatars/student.png",
+			AvatarPath:      "avatars/student.png",
 			CreatedAt:       createdAt.Add(-time.Hour),
 		}
 		row, err := studentService.studentResponse(user, profile)
@@ -86,7 +86,7 @@ func TestStudentResponse(t *testing.T) {
 		if strings.Contains(string(body), "password") || strings.Contains(string(body), "secret") {
 			t.Fatal("credentials exposed")
 		}
-		profile.AvatarURL = ""
+		profile.AvatarPath = ""
 		row, err = studentService.studentResponse(user, profile)
 		if err != nil || row.AvatarURL != "/uploads/avatars/default.png" {
 			t.Fatalf("default avatar: %v %+v", err, row)

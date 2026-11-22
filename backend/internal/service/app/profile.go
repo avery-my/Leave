@@ -93,7 +93,7 @@ func (p *ProfileService) GetProfile(studentID string) (*dto.ProfileResponse, err
 	}
 
 	data := toProfileResponse(profile, class, apartment)
-	avatarPath := profile.AvatarURL
+	avatarPath := profile.AvatarPath
 	if avatarPath == "" {
 		avatarPath = service.DefaultAvatarPath
 	}

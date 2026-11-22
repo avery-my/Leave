@@ -144,7 +144,7 @@ func (u *UserService) buildLoginUser(studentID string) (dto.User, bool, error) {
 	}
 
 	loginUser.Name = profile.Name
-	loginUser.AvatarURL = profile.AvatarURL
+	loginUser.AvatarURL = profile.AvatarPath
 
 	class, err := u.dao.GetClassByID(profile.ClassID)
 	if err != nil {

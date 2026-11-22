@@ -19,7 +19,7 @@
 }
 ```
 
-数据库 `profiles.avatar_url` 保存 `avatars/abc123.jpg` 形式的相对路径。
+数据库 `profiles.avatar_path` 保存 `avatars/abc123.jpg` 形式的相对路径。
 创建个人资料时头像字段为空字符串，仅在用户上传头像后保存相对路径。
 查询个人资料的 `GET /api/v1/profile` 返回拼接后的 `avatar_url`，历史空头像路径也使用默认头像。
 更新个人资料不会覆盖头像；上传头像更新成功后删除旧头像，保留共享默认头像；数据库更新失败则清理新文件。

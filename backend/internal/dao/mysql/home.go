@@ -16,7 +16,7 @@ func (s *DAO) GetHomeUser(tx *gorm.DB, studentID string) (dto.HomeUser, error) {
 		Select(
 			"users.role",
 			"COALESCE(profiles.name, '') AS name",
-			"COALESCE(profiles.avatar_url, '') AS avatar_url",
+			"COALESCE(profiles.avatar_path, '') AS avatar_url",
 			"COALESCE(classes.class_name, '') AS class_name",
 		).
 		Joins("LEFT JOIN profiles ON profiles.student_id = users.student_id AND profiles.deleted_at IS NULL").

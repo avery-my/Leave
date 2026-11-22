@@ -109,7 +109,7 @@ func testAdminStudents(t *testing.T, dao *DAO) {
 		t.Fatal(err)
 	}
 	row, err = dao.GetProfileByStuID(users[2].StudentID)
-	if err != nil || row.AvatarURL != "avatars/test.png" || row.ApartmentID != 0 || row.DormitoryNumber != "" {
+	if err != nil || row.AvatarPath != "avatars/test.png" || row.ApartmentID != 0 || row.DormitoryNumber != "" {
 		t.Fatalf("clear dorm/preserve avatar: %v %+v", err, row)
 	}
 	classes, err := dao.GetClassOptions(false)
@@ -188,7 +188,7 @@ func testAdminStudents(t *testing.T, dao *DAO) {
 		t.Fatal(err)
 	}
 	row, err = dao.GetProfileByStuID(users[2].StudentID)
-	if err != nil || row.Name != input.Name || row.AvatarURL != "avatars/test.png" {
+	if err != nil || row.Name != input.Name || row.AvatarPath != "avatars/test.png" {
 		t.Fatalf("restore profile: %v %+v", err, row)
 	}
 }

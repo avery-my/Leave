@@ -110,8 +110,8 @@ func TestHomeIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	profiles := []models.Profile{
-		{StudentID: "student-a", ClassID: class.ID, Name: "张三", AvatarURL: "avatars/student-a.png"},
-		{StudentID: "student-b", Name: "李四", AvatarURL: "avatars/student-b.png"},
+		{StudentID: "student-a", ClassID: class.ID, Name: "张三", AvatarPath: "avatars/student-a.png"},
+		{StudentID: "student-b", Name: "李四", AvatarPath: "avatars/student-b.png"},
 	}
 	if err := db.Create(&profiles).Error; err != nil {
 		t.Fatal(err)

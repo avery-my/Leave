@@ -43,7 +43,7 @@ func (s *DAO) GetProfileByStuID(studentID string) (data *models.Profile, err err
 func (s *DAO) UpdateProfileAvatar(studentID, key string) error {
 	result := s.db.Model(&models.Profile{}).
 		Where("student_id = ?", studentID).
-		Update("avatar_url", key)
+		Update("avatar_path", key)
 	if result.Error != nil {
 		return result.Error
 	}

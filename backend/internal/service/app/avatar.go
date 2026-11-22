@@ -67,7 +67,7 @@ func (a *AvatarService) UploadAvatar(studentID string, content io.Reader) (*dto.
 		return nil, errors.Join(err, file.Delete(root, key))
 	}
 	// 更新已成功，旧文件清理失败只记录日志，避免客户端重复上传。
-	if err := deleteOldAvatar(root, profile.AvatarURL); err != nil {
+	if err := deleteOldAvatar(root, profile.AvatarPath); err != nil {
 		a.logger.Warn("清理旧头像失败",
 			zap.String("operation", "app.avatar.cleanup_old"),
 			logutil.Error(err),
