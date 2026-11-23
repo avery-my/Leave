@@ -7,7 +7,7 @@ import (
 	"backend/internal/request"
 	"backend/internal/response"
 	appservice "backend/internal/service/app"
-	"backend/internal/service/common"
+	sharedoptions "backend/internal/service/common/options"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -16,10 +16,10 @@ import (
 type OptionsHandler struct {
 	logger        *zap.Logger
 	options       *appservice.OptionsService
-	commonOptions *common.OptionsService
+	commonOptions *sharedoptions.OptionsService
 }
 
-func NewOptionsHandler(options *appservice.OptionsService, commonOptions *common.OptionsService, logger *zap.Logger) *OptionsHandler {
+func NewOptionsHandler(options *appservice.OptionsService, commonOptions *sharedoptions.OptionsService, logger *zap.Logger) *OptionsHandler {
 	return &OptionsHandler{
 		logger:        logger,
 		options:       options,
@@ -54,7 +54,7 @@ func (o *OptionsHandler) GetApartmentOptionsHandler(c *gin.Context) {
 	}
 	data, err := o.options.GetProfileApartmentOptions(studentID, c.Query("gender"))
 	if err != nil {
-		if errors.Is(err, common.ErrorInvalidApartmentGender) {
+		if errors.Is(err, sharedoptions.ErrorInvalidApartmentGender) {
 			response.Error(c, response.CodeInvalidParam)
 			return
 		}

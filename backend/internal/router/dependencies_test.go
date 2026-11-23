@@ -10,7 +10,7 @@ import (
 	"backend/internal/middleware"
 	adminservice "backend/internal/service/admin"
 	appservice "backend/internal/service/app"
-	commonservice "backend/internal/service/common"
+	sharedoptions "backend/internal/service/common/options"
 	"backend/internal/testutil"
 	"backend/internal/testutil/sessiontest"
 
@@ -20,7 +20,7 @@ import (
 func testDependencies(t *testing.T, dao *mysql.DAO, settings config.Config) Dependencies {
 	limiter := testutil.NewRateLimiter(t)
 	tokens := sessiontest.NewStore(t)
-	commonOptionsService := commonservice.NewOptionsService(dao, zap.NewNop())
+	commonOptionsService := sharedoptions.NewOptionsService(dao, zap.NewNop())
 	appVersionService := appservice.NewAppVersionService(dao, zap.NewNop())
 	appAvatarService := appservice.NewAvatarService(dao, settings.Storage, zap.NewNop())
 	appFeedbackService := appservice.NewFeedbackService(dao, settings.Storage, zap.NewNop())

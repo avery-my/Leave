@@ -10,7 +10,7 @@ import (
 	"backend/internal/router"
 	adminservice "backend/internal/service/admin"
 	appservice "backend/internal/service/app"
-	commonservice "backend/internal/service/common"
+	sharedoptions "backend/internal/service/common/options"
 	"backend/internal/session"
 
 	"github.com/redis/go-redis/v9"
@@ -21,7 +21,7 @@ import (
 func buildDependencies(cfg config.Config, dao *mysql.DAO, logger *zap.Logger, redisClient *redis.Client) router.Dependencies {
 	limiter := middleware.NewRateLimiter(redisClient, logger)
 	tokens := session.NewStore(redisdao.NewDAO(redisClient, cfg.App.Namespace), cfg.Session)
-	commonOptionsService := commonservice.NewOptionsService(dao, logger)
+	commonOptionsService := sharedoptions.NewOptionsService(dao, logger)
 	appVersionService := appservice.NewAppVersionService(dao, logger)
 	appAvatarService := appservice.NewAvatarService(dao, cfg.Storage, logger)
 	appFeedbackService := appservice.NewFeedbackService(dao, cfg.Storage, logger)

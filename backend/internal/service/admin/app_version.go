@@ -7,7 +7,7 @@ import (
 	"backend/internal/dao/mysql"
 	"backend/internal/dto"
 	"backend/internal/models"
-	"backend/internal/service/common"
+	"backend/internal/service/common/releasenotes"
 
 	"go.uber.org/zap"
 )
@@ -38,7 +38,7 @@ func normalizeAppVersionQuery(query *dto.AppVersionListQuery) error {
 }
 
 func adminAppVersion(row *models.AppVersion) (*dto.AdminAppVersion, error) {
-	notes, grouped, err := common.ParseReleaseNotes(row.ReleaseNotes)
+	notes, grouped, err := releasenotes.ParseReleaseNotes(row.ReleaseNotes)
 	if err != nil {
 		return nil, err
 	}

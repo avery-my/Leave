@@ -3,7 +3,7 @@ package app
 import (
 	"backend/internal/dao/mysql"
 	"backend/internal/dto"
-	commonservice "backend/internal/service/common"
+	sharedoptions "backend/internal/service/common/options"
 
 	"go.uber.org/zap"
 )
@@ -11,10 +11,10 @@ import (
 type OptionsService struct {
 	logger  *zap.Logger
 	dao     *mysql.DAO
-	options *commonservice.OptionsService
+	options *sharedoptions.OptionsService
 }
 
-func NewOptionsService(dao *mysql.DAO, options *commonservice.OptionsService, logger *zap.Logger) *OptionsService {
+func NewOptionsService(dao *mysql.DAO, options *sharedoptions.OptionsService, logger *zap.Logger) *OptionsService {
 	return &OptionsService{
 		logger:  logger,
 		dao:     dao,

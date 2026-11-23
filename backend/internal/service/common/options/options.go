@@ -1,4 +1,4 @@
-package common
+package options
 
 import (
 	"errors"

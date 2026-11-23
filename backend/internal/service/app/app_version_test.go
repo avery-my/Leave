@@ -8,13 +8,13 @@ import (
 
 	"backend/internal/dto"
 	"backend/internal/response"
-	"backend/internal/service/common"
+	"backend/internal/service/common/releasenotes"
 	"github.com/gin-gonic/gin"
 )
 
 func TestAppVersionResponseContracts(t *testing.T) {
 	for _, raw := range []string{`["旧说明"]`, `{"features":["新增"],"notices":["重新登录"]}`} {
-		notes, grouped, err := common.ParseReleaseNotes(raw)
+		notes, grouped, err := releasenotes.ParseReleaseNotes(raw)
 		if err != nil {
 			t.Fatal(err)
 		}

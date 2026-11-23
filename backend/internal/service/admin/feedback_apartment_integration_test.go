@@ -14,7 +14,7 @@ import (
 	"backend/internal/dto"
 	"backend/internal/models"
 	appservice "backend/internal/service/app"
-	commonservice "backend/internal/service/common"
+	sharedoptions "backend/internal/service/common/options"
 
 	driver "github.com/go-sql-driver/mysql"
 	"go.uber.org/zap"
@@ -109,11 +109,11 @@ func TestFeedbackApartmentIntegration(t *testing.T) {
 	if err != nil || list.Total != 1 || len(list.Items) != 1 {
 		t.Fatalf("filter: %+v %v", list, err)
 	}
-	appOptions, err := commonservice.NewOptionsService(dao, zap.NewNop()).GetApartmentOptions(models.GenderMale, true)
+	appOptions, err := sharedoptions.NewOptionsService(dao, zap.NewNop()).GetApartmentOptions(models.GenderMale, true)
 	if err != nil || len(appOptions) != 0 {
 		t.Fatalf("disabled App options: %+v %v", appOptions, err)
 	}
-	adminOptions, err := commonservice.NewOptionsService(dao, zap.NewNop()).GetApartmentOptions(models.GenderMale, false)
+	adminOptions, err := sharedoptions.NewOptionsService(dao, zap.NewNop()).GetApartmentOptions(models.GenderMale, false)
 	if err != nil || len(adminOptions) != 1 || adminOptions[0].IsEnabled {
 		t.Fatalf("admin options: %+v %v", adminOptions, err)
 	}
@@ -140,7 +140,7 @@ func TestFeedbackApartmentIntegration(t *testing.T) {
 	if err := profileService.Profile(&profileInput, "resident"); err != nil {
 		t.Fatalf("retain disabled: %v", err)
 	}
-	optionsService := appservice.NewOptionsService(dao, commonservice.NewOptionsService(dao, zap.NewNop()), zap.NewNop())
+	optionsService := appservice.NewOptionsService(dao, sharedoptions.NewOptionsService(dao, zap.NewNop()), zap.NewNop())
 	residentApartments, err := optionsService.GetProfileApartmentOptions("resident", models.GenderMale)
 	if err != nil || len(residentApartments) != 1 || residentApartments[0].ID != row.ID || residentApartments[0].IsEnabled {
 		t.Fatalf("retain disabled apartment option: %+v %v", residentApartments, err)

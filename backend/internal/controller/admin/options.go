@@ -6,7 +6,7 @@ import (
 	logutil "backend/internal/logger"
 	"backend/internal/request"
 	"backend/internal/response"
-	"backend/internal/service/common"
+	sharedoptions "backend/internal/service/common/options"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -14,10 +14,10 @@ import (
 
 type OptionsHandler struct {
 	logger  *zap.Logger
-	options *common.OptionsService
+	options *sharedoptions.OptionsService
 }
 
-func NewOptionsHandler(options *common.OptionsService, logger *zap.Logger) *OptionsHandler {
+func NewOptionsHandler(options *sharedoptions.OptionsService, logger *zap.Logger) *OptionsHandler {
 	return &OptionsHandler{
 		logger:  logger,
 		options: options,
@@ -46,7 +46,7 @@ func (o *OptionsHandler) GetApartmentOptionsHandler(c *gin.Context) {
 
 	data, err := o.options.GetApartmentOptions(c.Query("gender"), false)
 	if err != nil {
-		if errors.Is(err, common.ErrorInvalidApartmentGender) {
+		if errors.Is(err, sharedoptions.ErrorInvalidApartmentGender) {
 			response.Error(c, response.CodeInvalidParam)
 			return
 		}

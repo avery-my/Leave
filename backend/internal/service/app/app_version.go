@@ -7,7 +7,7 @@ import (
 	"backend/internal/dao/mysql"
 	"backend/internal/dto"
 	"backend/internal/models"
-	"backend/internal/service/common"
+	"backend/internal/service/common/releasenotes"
 
 	"go.uber.org/zap"
 )
@@ -43,7 +43,7 @@ func (a *AppVersionService) GetCurrentAppVersion(platform string, currentVersion
 		Updates:           make([]dto.AppVersionUpdate, 0, len(updates)),
 	}
 	for _, update := range updates {
-		notes, grouped, parseErr := common.ParseReleaseNotes(update.ReleaseNotes)
+		notes, grouped, parseErr := releasenotes.ParseReleaseNotes(update.ReleaseNotes)
 		if parseErr != nil {
 			a.logger.Warn("Invalid App release notes", zap.Uint64("version_id", update.ID), zap.Error(parseErr))
 			notes = []string{}

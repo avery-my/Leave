@@ -12,7 +12,7 @@ import (
 	"backend/internal/request"
 	"backend/internal/response"
 	adminservice "backend/internal/service/admin"
-	commonservice "backend/internal/service/common"
+	sharedoptions "backend/internal/service/common/options"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -40,7 +40,7 @@ func TestManagementRejectsInvalidRequests(t *testing.T) {
 		{appVersionHandler.GetAppVersionHandler, "GET", "/items/-1", ""},
 		{appVersionHandler.GetAppVersionHandler, "GET", "/items/bad", ""},
 		{appVersionHandler.GetAppVersionHandler, "GET", "/items/18446744073709551616", ""},
-		{NewOptionsHandler(commonservice.NewOptionsService(dao, zap.NewNop()), zap.NewNop()).GetApartmentOptionsHandler, "GET", "/items?gender=unknown", ""},
+		{NewOptionsHandler(sharedoptions.NewOptionsService(dao, zap.NewNop()), zap.NewNop()).GetApartmentOptionsHandler, "GET", "/items?gender=unknown", ""},
 		{studentHandler.GetStudentsHandler, "GET", "/items?page=0", ""},
 		{recordHandler.GetRecordsHandler, "GET", "/items?page=0", ""},
 		{recordHandler.GetRecordsHandler, "GET", "/items?page_size=101", ""},

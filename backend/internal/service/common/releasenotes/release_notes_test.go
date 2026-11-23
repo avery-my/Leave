@@ -1,4 +1,4 @@
-package common
+package releasenotes
 
 import (
 	"backend/internal/dto"
