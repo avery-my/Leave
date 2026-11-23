@@ -100,6 +100,8 @@ In Windows PowerShell, use `Invoke-RestMethod http://127.0.0.1:8080/api/v1/healt
 
 App requests also check the client version. Prepare published version data matching `frontend/manifest.json` before app integration; see the [release guide](deploy/README.md) for version data and APK preparation.
 
+For internal school photo retrieval, set `SCHOOL_URL` and `SCHOOL_PASSWORD` in the root `.env`. The calling service supplies the username and captcha. Photos are saved under `photo/` inside the YAML-configured `storage.root_dir`.
+
 #### Internal OCR
 
 Construct a shared instance with `ocr.NewService(logger)` from `backend/internal/service/common/ocr` and inject it into the consuming service. Call `ocrService.RecognizeBase64(imageBase64)` and close the instance at shutdown. It accepts a PNG or JPEG as Base64 or a data URI and returns text and an error. For local development, set the working directory to `backend/` or the repository root. Models are in `backend/assets/ocr/model`. Put the platform’s ONNX Runtime library in `backend/assets/ocr/lib` or set `OCR_ONNX_RUNTIME` to its absolute path.

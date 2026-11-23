@@ -77,13 +77,19 @@ func TestLoadLogConfig(t *testing.T) {
 }
 
 func TestInitReadsTestConfig(t *testing.T) {
+	for _, key := range []string{"SCHOOL_URL", "SCHOOL_PASSWORD"} {
+		t.Setenv(key, "")
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	t.Chdir(t.TempDir())
 	t.Setenv("MYSQL_PASSWORD", "test-password")
 	if err := os.Mkdir("config", 0755); err != nil {
 		t.Fatal(err)
 	}
-	content := "redis:\n  host: localhost\n  port: 6379\napp:\n  namespace: test\n  port: 9000\nmysql:\n  database: leave_list_test\nstorage:\n  root_dir: ./uploads\n  base_url: /api/v1/uploads\nsession:\n  student_ttl: 720h\n  admin_ttl: 8h\n"
+	content := "redis:\n  host: localhost\n  port: 6379\napp:\n  namespace: test\n  port: 9000\nmysql:\n  database: leave_list_test\nstorage:\n  root_dir: ./uploads\n  base_url: /api/v1/uploads\nsession:\n  student_ttl: 720h\n  admin_ttl: 8h\nschool:\n  url: https://ignored.example.test\n  password: ignored\n"
 	if err := os.WriteFile("config/config.test.yaml", []byte(content), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -93,6 +99,9 @@ func TestInitReadsTestConfig(t *testing.T) {
 	}
 	if cfg.Mysql.Database != "leave_list_test" || cfg.App.Port != 9000 {
 		t.Fatalf("wrong test configuration: database=%q port=%d", cfg.Mysql.Database, cfg.App.Port)
+	}
+	if cfg.School != (SchoolConfig{}) {
+		t.Fatal("school configuration should come only from the environment")
 	}
 }
 
@@ -108,10 +117,10 @@ func TestInitFromReleaseDirectory(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(root, "config/config.test.yaml"), []byte(content), 0600); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.WriteFile(filepath.Join(root, ".env"), []byte("MYSQL_PASSWORD=release-password\nREDIS_PASSWORD=redis-release-password\n"), 0600); err != nil {
+			if err := os.WriteFile(filepath.Join(root, ".env"), []byte("MYSQL_PASSWORD=release-password\nREDIS_PASSWORD=redis-release-password\nSCHOOL_URL=https://school.example.test\nSCHOOL_PASSWORD=school-test-password\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
-			for _, key := range []string{"MYSQL_PASSWORD", "REDIS_PASSWORD"} {
+			for _, key := range []string{"MYSQL_PASSWORD", "REDIS_PASSWORD", "SCHOOL_URL", "SCHOOL_PASSWORD"} {
 				t.Setenv(key, "")
 				if err := os.Unsetenv(key); err != nil {
 					t.Fatal(err)
@@ -128,6 +137,13 @@ func TestInitFromReleaseDirectory(t *testing.T) {
 			}
 			if cfg.Mysql.Database != "leave_list_test" || cfg.Mysql.Password != "release-password" || cfg.Redis.Password != "redis-release-password" {
 				t.Fatal("release directory did not load root test YAML and .env")
+			}
+			wantSchool := SchoolConfig{
+				URL:      "https://school.example.test",
+				Password: "school-test-password",
+			}
+			if cfg.School != wantSchool {
+				t.Fatal("release directory did not load school configuration from root .env")
 			}
 		})
 	}

@@ -44,7 +44,13 @@ type LogConfig struct {
 	Encoding string `mapstructure:"encoding"`
 	Dir      string `mapstructure:"dir"`
 }
+type SchoolConfig struct {
+	URL      string
+	Password string
+}
+
 type Config struct {
+	School  SchoolConfig  `mapstructure:"-"`
 	Session SessionConfig `mapstructure:"session"`
 	Redis   RedisConfig   `mapstructure:"redis"`
 	Log     LogConfig     `mapstructure:"log"`
@@ -84,6 +90,10 @@ func Load() (Config, error) {
 	// 将配置解析到cfg结构体
 	if err := v.Unmarshal(&cfg); err != nil {
 		return Config{}, fmt.Errorf("解析配置失败: %w", err)
+	}
+	cfg.School = SchoolConfig{
+		URL:      os.Getenv("SCHOOL_URL"),
+		Password: os.Getenv("SCHOOL_PASSWORD"),
 	}
 	cfg.Redis.Host = strings.TrimSpace(cfg.Redis.Host)
 	cfg.App.Namespace = strings.TrimSpace(cfg.App.Namespace)

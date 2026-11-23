@@ -1,6 +1,7 @@
-package main
+package schoollogin
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,12 +9,11 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 )
 
-func fetchPhotoID(client *http.Client, baseURL, token string) (string, error) {
-	req, err := http.NewRequest(http.MethodPost, baseURL+"/api/auth/user", nil)
+func fetchPhotoID(ctx context.Context, client *http.Client, baseURL, token string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/api/auth/user", nil)
 	if err != nil {
 		return "", err
 	}
@@ -74,41 +74,39 @@ func parsePhotoID(photo string) (string, error) {
 	return photoID, nil
 }
 
-func downloadPhoto(client *http.Client, baseURL, token, photoID string) (string, error) {
+func downloadPhoto(ctx context.Context, client *http.Client, baseURL, token, photoID string) ([]byte, error) {
 	query := url.Values{"access_token": {token}}
 	photoURL := baseURL + "/api/file/inline/" + url.PathEscape(photoID) + "?" + query.Encode()
-	req, err := http.NewRequest(http.MethodGet, photoURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, photoURL, nil)
 	if err != nil {
-		return "", errors.New("构建照片请求失败")
+		return nil, errors.New("构建照片请求失败")
 	}
 	req.Header.Set("Referer", baseURL+"/checkin/workbench")
 	req.Header.Set("Accept", "image/*")
 	resp, err := client.Do(req)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		// URL 错误包含完整请求地址，查询参数里有令牌。
-		return "", errors.New("请求照片失败")
+		return nil, errors.New("请求照片失败")
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("下载照片失败 (HTTP %d)", resp.StatusCode)
+		return nil, fmt.Errorf("下载照片失败 (HTTP %d)", resp.StatusCode)
 	}
 	mediaType, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	if err != nil || mediaType != "image/jpeg" {
-		return "", errors.New("照片响应格式异常，预期 JPEG")
+		return nil, errors.New("照片响应格式异常，预期 JPEG")
 	}
 
-	file, err := os.CreateTemp(schoolLoginDir, "photo-*.jpg")
-	if err != nil {
-		return "", fmt.Errorf("创建照片文件: %w", err)
-	}
 	const maxPhotoBytes = 20 << 20
-	size, copyErr := io.Copy(file, io.LimitReader(resp.Body, maxPhotoBytes+1))
-	closeErr := file.Close()
-	if size == 0 || size > maxPhotoBytes {
-		copyErr = errors.Join(copyErr, errors.New("照片大小超出允许范围"))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxPhotoBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("读取照片: %w", err)
 	}
-	if err := errors.Join(copyErr, closeErr); err != nil {
-		return "", fmt.Errorf("保存照片: %w", errors.Join(err, os.Remove(file.Name())))
+	if len(data) == 0 || len(data) > maxPhotoBytes {
+		return nil, errors.New("照片大小超出允许范围")
 	}
-	return file.Name(), nil
+	return data, nil
 }

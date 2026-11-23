@@ -1,21 +1,15 @@
-package main
+package schoollogin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/cookiejar"
-	"os"
 	"strings"
 	"time"
-)
-
-const (
-	captchaID     = ""
-	captchaAnswer = ""
 )
 
 type loginRequest struct {
@@ -26,57 +20,13 @@ type loginRequest struct {
 	Remember bool   `json:"remember"`
 }
 
-func main() {
-	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-}
-
-func run() error {
-	schoolURL, username, password, err := loadSchoolConfig()
-	if err != nil {
-		return err
-	}
-	if captchaID == "" || strings.TrimSpace(captchaAnswer) == "" {
-		return errors.New("请在 main.go 填写 captchaID 和 captchaAnswer")
-	}
-
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		return err
-	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.Proxy = nil
-	defer transport.CloseIdleConnections()
-	client := &http.Client{
-		Jar:       jar,
-		Transport: transport,
-		Timeout:   15 * time.Second,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-
-	token, err := login(client, schoolURL, username, password, captchaID, strings.TrimSpace(captchaAnswer))
-	if err != nil {
-		return err
-	}
-	photoID, err := fetchPhotoID(client, schoolURL, token)
-	if err != nil {
-		return err
-	}
-	path, err := downloadPhoto(client, schoolURL, token, photoID)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("照片已保存到 %s\n", path)
-	return nil
-}
-
-func login(client *http.Client, baseURL, username, password, cid, answer string) (string, error) {
+func login(ctx context.Context, client *http.Client, baseURL, username, password, cid, answer string) (string, error) {
 	scriptURL := fmt.Sprintf("%s/api/sec_js?t=%d", baseURL, time.Now().UnixMilli())
-	script, err := client.Get(scriptURL)
+	scriptRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, scriptURL, nil)
+	if err != nil {
+		return "", err
+	}
+	script, err := client.Do(scriptRequest)
 	if err != nil {
 		return "", fmt.Errorf("获取安全脚本: %w", err)
 	}
@@ -103,7 +53,7 @@ func login(client *http.Client, baseURL, username, password, cid, answer string)
 	if err != nil {
 		return "", err
 	}
-	req, err := http.NewRequest(http.MethodPost, baseURL+"/api/login", bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/api/login", bytes.NewReader(payload))
 	if err != nil {
 		return "", err
 	}
