@@ -58,26 +58,39 @@ func run() error {
 		},
 	}
 
-	return login(client, schoolURL, username, password, captchaID, strings.TrimSpace(captchaAnswer))
+	token, err := login(client, schoolURL, username, password, captchaID, strings.TrimSpace(captchaAnswer))
+	if err != nil {
+		return err
+	}
+	photoID, err := fetchPhotoID(client, schoolURL, token)
+	if err != nil {
+		return err
+	}
+	path, err := downloadPhoto(client, schoolURL, token, photoID)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("照片已保存到 %s\n", path)
+	return nil
 }
 
-func login(client *http.Client, baseURL, username, password, cid, answer string) error {
+func login(client *http.Client, baseURL, username, password, cid, answer string) (string, error) {
 	scriptURL := fmt.Sprintf("%s/api/sec_js?t=%d", baseURL, time.Now().UnixMilli())
 	script, err := client.Get(scriptURL)
 	if err != nil {
-		return fmt.Errorf("获取安全脚本: %w", err)
+		return "", fmt.Errorf("获取安全脚本: %w", err)
 	}
 	defer script.Body.Close()
 	if script.StatusCode != http.StatusOK {
-		return fmt.Errorf("获取安全脚本失败 (HTTP %d)", script.StatusCode)
+		return "", fmt.Errorf("获取安全脚本失败 (HTTP %d)", script.StatusCode)
 	}
 	source, err := io.ReadAll(io.LimitReader(script.Body, 1<<20))
 	if err != nil {
-		return fmt.Errorf("读取安全脚本: %w", err)
+		return "", fmt.Errorf("读取安全脚本: %w", err)
 	}
 	key, err := parseLoginKey(string(source))
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	payload, err := json.Marshal(loginRequest{
@@ -88,31 +101,34 @@ func login(client *http.Client, baseURL, username, password, cid, answer string)
 		Remember: false,
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 	req, err := http.NewRequest(http.MethodPost, baseURL+"/api/login", bytes.NewReader(payload))
 	if err != nil {
-		return err
+		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("提交登录: %w", err)
+		return "", fmt.Errorf("提交登录: %w", err)
 	}
 	defer resp.Body.Close()
 	const maxResponseBytes = 1 << 20
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
-		return fmt.Errorf("读取登录响应 (HTTP %d): %w", resp.StatusCode, err)
+		return "", fmt.Errorf("读取登录响应 (HTTP %d): %w", resp.StatusCode, err)
 	}
 	if len(body) > maxResponseBytes {
-		return fmt.Errorf("登录响应超过大小限制 (HTTP %d)", resp.StatusCode)
+		return "", fmt.Errorf("登录响应超过大小限制 (HTTP %d)", resp.StatusCode)
 	}
 
 	var result struct {
 		Code    *int   `json:"code"`
 		Message string `json:"message"`
+		Data    struct {
+			AccessToken string `json:"access_token"`
+		} `json:"data"`
 	}
 	decodeErr := json.Unmarshal(body, &result)
 	if resp.StatusCode != http.StatusOK || (decodeErr == nil && result.Code != nil && *result.Code != 0) {
@@ -124,22 +140,20 @@ func login(client *http.Client, baseURL, username, password, cid, answer string)
 		if decodeErr == nil {
 			for _, reason := range []string{"参数解码错误", "验证码已过期", "验证码错误", "验证码不正确", "账号或密码错误", "用户名或密码错误"} {
 				if strings.Contains(result.Message, reason) {
-					return fmt.Errorf("登录失败 (%s) %s", status, reason)
+					return "", fmt.Errorf("登录失败 (%s) %s", status, reason)
 				}
 			}
 		}
-		return fmt.Errorf("登录失败 (%s)", status)
+		return "", fmt.Errorf("登录失败 (%s)", status)
 	}
 	if decodeErr != nil {
-		return errors.New("登录接口响应格式异常")
+		return "", errors.New("登录接口响应格式异常")
 	}
 	if result.Code == nil {
-		return errors.New("登录接口响应缺少业务状态码")
+		return "", errors.New("登录接口响应缺少业务状态码")
 	}
-	var formatted bytes.Buffer
-	if err := json.Indent(&formatted, bytes.TrimSpace(body), "", "    "); err != nil {
-		return fmt.Errorf("格式化登录响应: %w", err)
+	if result.Data.AccessToken == "" {
+		return "", errors.New("登录响应缺少 data.access_token")
 	}
-	_, err = fmt.Fprintf(os.Stdout, "学校登录接口返回成功\n%s\n", formatted.Bytes())
-	return err
+	return result.Data.AccessToken, nil
 }

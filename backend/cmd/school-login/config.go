@@ -8,8 +8,10 @@ import (
 	"strings"
 )
 
+const schoolLoginDir = "cmd/school-login"
+
 func loadSchoolConfig() (site, username, password string, err error) {
-	const path = "cmd/school-login/.env"
+	const path = schoolLoginDir + "/.env"
 	file, err := os.Open(path)
 	if err != nil {
 		return "", "", "", fmt.Errorf("从 backend 目录运行，并检查 %s: %w", path, err)
