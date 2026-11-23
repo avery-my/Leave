@@ -255,4 +255,4 @@ git commit -m "db: add app version channel"
 
 ### 分类更新说明
 
-当前发布配置统一位于 `deploy/release.yaml`。`app.android.release_notes` 支持 features、improvements、bug_fixes、notices 四类字符串数组，也兼容历史数组。新说明直接以 JSON 对象保存到现有 `app_versions.release_notes` 列；无需每次发版创建 migration。000014 只变更字段注释，不转换旧数据；down 也不会恢复旧后端对 JSON 数组的假设。接口保留展开数组并新增分类字段，详见 [版本接口说明](../docs/app-version.md)。
+当前发布配置统一位于 `deploy/release.yaml`。`app.android.release_notes` 支持 features、improvements、bug_fixes、notices 四类字符串数组，也兼容历史数组。新说明直接以 JSON 对象保存到现有 `app_versions.release_notes` 列；无需每次发版创建 migration。000014 只变更字段注释，不转换旧数据；down 也不会恢复旧后端对 JSON 数组的假设。App 接口返回分类说明或未分类的历史条目，管理端接口同时保留展开数组，详见 [版本接口说明](../docs/app-version.md)。

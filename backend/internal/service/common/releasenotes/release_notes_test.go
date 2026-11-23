@@ -1,8 +1,6 @@
 package releasenotes
 
 import (
-	"backend/internal/dto"
-	"encoding/json"
 	"reflect"
 	"testing"
 )
@@ -36,18 +34,6 @@ func TestParseReleaseNotes(t *testing.T) {
 			}
 			if !reflect.DeepEqual(notes, tc.want) || (grouped != nil) != tc.grouped {
 				t.Fatalf("got %#v, %#v", notes, grouped)
-			}
-			// Both normal version queries and forced-update data use this DTO.
-			wire, err := json.Marshal(dto.AppVersionResponse{Updates: []dto.AppVersionUpdate{{ReleaseNotes: notes, ReleaseNotesGrouped: grouped}}})
-			if err != nil {
-				t.Fatal(err)
-			}
-			var decoded dto.AppVersionResponse
-			if err := json.Unmarshal(wire, &decoded); err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(decoded.Updates[0].ReleaseNotes, tc.want) {
-				t.Fatalf("legacy wire lost notes: %s", wire)
 			}
 			if grouped != nil && (grouped.Features == nil || grouped.Improvements == nil || grouped.BugFixes == nil || grouped.Notices == nil) {
 				t.Fatal("categories must serialize as arrays")

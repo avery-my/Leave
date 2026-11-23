@@ -47,8 +47,7 @@ func ParseReleaseNotes(value string) ([]string, *dto.ReleaseNotesGrouped, error)
 		grouped.Notices = []string{}
 	}
 
-	// TODO(release-notes-compat): App 兼容字段的删除门槛见 dto.AppVersionUpdate。
-	// 管理端表格和首页摘要也依赖展开数组，需同步适配后才能移除此展开逻辑。
+	// 管理端表格和首页摘要使用展开后的数组。
 	notes = append(notes, grouped.Features...)
 	notes = append(notes, grouped.Improvements...)
 	notes = append(notes, grouped.BugFixes...)

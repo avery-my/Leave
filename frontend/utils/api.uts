@@ -62,7 +62,7 @@ export type ReleaseNoteSection = {
 export function releaseNoteSections(update: AppVersionUpdate): ReleaseNoteSection[] {
 	const grouped = update.release_notes_grouped
 	if (grouped == null) {
-		return update.release_notes.length == 0 ? [] : [{ title: '更新内容', items: update.release_notes }]
+		return update.uncategorized_notes.length == 0 ? [] : [{ title: '更新内容', items: update.uncategorized_notes }]
 	}
 	const sections: ReleaseNoteSection[] = [
 		{ title: '新增功能', items: grouped.features },
@@ -76,7 +76,7 @@ export function releaseNoteSections(update: AppVersionUpdate): ReleaseNoteSectio
 export type AppVersionUpdate = {
 	version_code: number
 	version_name: string
-	release_notes: string[]
+	uncategorized_notes: string[]
 	release_notes_grouped: ReleaseNotesGrouped | null
 }
 
@@ -391,12 +391,15 @@ export function handleUnauthorized() {
 	uni.reLaunch({ url: '/pages/auth/login' })
 }
 
-function appVersionInfoFromJSON(data: UTSJSONObject): AppVersionInfo {
+function appVersionInfoFromJSON(data: UTSJSONObject, fromStorage: boolean = false): AppVersionInfo {
 	const updatesData = data['updates'] as UTSJSONObject[] | null
 	const updates: AppVersionUpdate[] = []
 	if (updatesData != null) {
 		for (const update of updatesData) {
-			const updateNotes = update['release_notes'] as string[] | null
+			let updateNotes = update['uncategorized_notes'] as string[] | null
+			if (updateNotes == null && fromStorage) {
+				updateNotes = update['release_notes'] as string[] | null
+			}
 			const groupedData = update['release_notes_grouped'] as UTSJSONObject | null
 			let grouped: ReleaseNotesGrouped | null = null
 			if (groupedData != null) {
@@ -414,7 +417,7 @@ function appVersionInfoFromJSON(data: UTSJSONObject): AppVersionInfo {
 			updates.push({
 				version_code: update['version_code'] as number,
 				version_name: update['version_name'] as string,
-				release_notes: updateNotes == null ? [] : updateNotes,
+				uncategorized_notes: updateNotes == null ? [] : updateNotes,
 				release_notes_grouped: grouped
 			})
 		}
@@ -438,7 +441,7 @@ export function getStoredUpdateInfo(): AppVersionInfo | null {
 	try {
 		const data = JSON.parse<UTSJSONObject>(storedValue)
 		if (data == null) return null
-		return appVersionInfoFromJSON(data)
+		return appVersionInfoFromJSON(data, true)
 	} catch (_) {
 		return null
 	}
