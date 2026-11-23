@@ -14,11 +14,8 @@ import (
 )
 
 const (
-	schoolURL      = "https://xgxtv5.imut.edu.cn"
-	schoolUsername = ""
-	schoolPassword = ""
-	captchaID      = ""
-	captchaAnswer  = ""
+	captchaID     = ""
+	captchaAnswer = ""
 )
 
 type loginRequest struct {
@@ -34,13 +31,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	fmt.Println("学校登录接口返回成功")
 }
 
 func run() error {
-	username := strings.TrimSpace(schoolUsername)
-	if username == "" || schoolPassword == "" {
-		return errors.New("请在 main.go 填写 schoolUsername 和 schoolPassword")
+	schoolURL, username, password, err := loadSchoolConfig()
+	if err != nil {
+		return err
 	}
 	if captchaID == "" || strings.TrimSpace(captchaAnswer) == "" {
 		return errors.New("请在 main.go 填写 captchaID 和 captchaAnswer")
@@ -62,7 +58,7 @@ func run() error {
 		},
 	}
 
-	return login(client, schoolURL, username, schoolPassword, captchaID, strings.TrimSpace(captchaAnswer))
+	return login(client, schoolURL, username, password, captchaID, strings.TrimSpace(captchaAnswer))
 }
 
 func login(client *http.Client, baseURL, username, password, cid, answer string) error {
@@ -105,11 +101,20 @@ func login(client *http.Client, baseURL, username, password, cid, answer string)
 		return fmt.Errorf("提交登录: %w", err)
 	}
 	defer resp.Body.Close()
+	const maxResponseBytes = 1 << 20
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
+	if err != nil {
+		return fmt.Errorf("读取登录响应 (HTTP %d): %w", resp.StatusCode, err)
+	}
+	if len(body) > maxResponseBytes {
+		return fmt.Errorf("登录响应超过大小限制 (HTTP %d)", resp.StatusCode)
+	}
+
 	var result struct {
 		Code    *int   `json:"code"`
 		Message string `json:"message"`
 	}
-	decodeErr := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&result)
+	decodeErr := json.Unmarshal(body, &result)
 	if resp.StatusCode != http.StatusOK || (decodeErr == nil && result.Code != nil && *result.Code != 0) {
 		status := fmt.Sprintf("HTTP %d", resp.StatusCode)
 		if decodeErr == nil && result.Code != nil {
@@ -131,5 +136,10 @@ func login(client *http.Client, baseURL, username, password, cid, answer string)
 	if result.Code == nil {
 		return errors.New("登录接口响应缺少业务状态码")
 	}
-	return nil
+	var formatted bytes.Buffer
+	if err := json.Indent(&formatted, bytes.TrimSpace(body), "", "    "); err != nil {
+		return fmt.Errorf("格式化登录响应: %w", err)
+	}
+	_, err = fmt.Fprintf(os.Stdout, "学校登录接口返回成功\n%s\n", formatted.Bytes())
+	return err
 }
