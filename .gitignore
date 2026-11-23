@@ -33,6 +33,7 @@ backend/*.test
 backend/main
 backend/local.air.toml
 backend/cmd/test/
+/backend/assets/ocr/lib/
 
 # JavaScript 依赖和工具缓存（包含 workspace 子包）
 node_modules/

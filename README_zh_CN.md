@@ -100,6 +100,10 @@ Windows PowerShell 可使用 `Invoke-RestMethod http://127.0.0.1:8080/api/v1/hea
 
 App 请求还会校验客户端版本。联调前需准备与 `frontend/manifest.json` 对应的已发布版本数据，版本数据与 APK 的准备方式见 [发布说明](deploy/README.md)。
 
+#### 内部 OCR
+
+通过 `backend/internal/service/common/ocr` 的 `ocr.NewService(logger)` 创建共享实例，再注入使用 OCR 的业务 Service。调用 `ocrService.RecognizeBase64(imageBase64)`，并在应用退出时关闭实例。输入是 PNG 或 JPEG 的 Base64 或 Data URI，返回识别文本和错误。本地开发时，将工作目录设为 `backend/` 或仓库根目录。模型位于 `backend/assets/ocr/model`。将对应平台的 ONNX Runtime 动态库放入 `backend/assets/ocr/lib`，或通过 `OCR_ONNX_RUNTIME` 指定动态库的绝对路径。
+
 ### Web 管理端
 
 macOS 终端

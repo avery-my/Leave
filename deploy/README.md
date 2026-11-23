@@ -72,6 +72,7 @@ admin/releases/vN/                  # index.html、assets 等
 packages/android/                   # 保留历史 APK
 uploads/                            # 持久上传文件
 logs/                               # 按日期保存的后端 JSON Lines 日志，不随版本发布覆盖
+assets/ocr/                         # OCR 模型与运行库，启用 OCR 时单独准备
 database/migrations/                # 累积历史，不修改同名文件
 scripts/migrate                     # 最新迁移工具
 backups/mysql/                      # 数据库备份
@@ -85,6 +86,8 @@ backups/deploy/                     # 历史备份及运行记录目录
 ```
 
 后端每个新版本目录包含 Leave、release.json。迁移工具仅放在 scripts/migrate，不随 backend/releases/vN 保存副本。旧生产版本保留在 Leave_old 中；新生产目录使用整数版本，不将历史目录自动补齐为新版本。
+
+启用 OCR 时，将 `det.onnx`、`rec.onnx` 和 `ppocr_keys_v1.txt` 放在环境根目录下的 `assets/ocr/model/`，将 Linux/amd64 的 `onnxruntime_amd64.so` 放在 `assets/ocr/lib/`。动态库也可通过 `OCR_ONNX_RUNTIME` 指定绝对路径。运行用户 `www` 需要能够读取资源。后端从 `backend/current/Leave` 启动时会定位到环境根目录的 OCR 资源。OCR 资源目前单独部署。
 
 ### 后端日志
 
