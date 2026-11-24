@@ -168,6 +168,7 @@ export type RecordApplicantInfo = {
 	parent_name: string
 	parent_phone: string
 	teacher_name: string
+	photo_url: string
 }
 
 export type LeaveTypeOption = {
@@ -891,15 +892,17 @@ export async function deleteRecord(id: number): Promise<void> {
 
 function recordDetailFromJSON(data: UTSJSONObject): RecordDetail {
 	const classInfo = data['class_info'] as UTSJSONObject
+	const applicantInfo = data['applicant_info'] as UTSJSONObject
 	return {
 		id: data['id'] as number,
 		student_id: data['student_id'] as string,
 		applicant_info: {
-			name: (data['applicant_info'] as UTSJSONObject)['name'] as string,
-			gender: (data['applicant_info'] as UTSJSONObject)['gender'] as string,
-			parent_name: (data['applicant_info'] as UTSJSONObject)['parent_name'] as string,
-			parent_phone: (data['applicant_info'] as UTSJSONObject)['parent_phone'] as string,
-			teacher_name: (data['applicant_info'] as UTSJSONObject)['teacher_name'] as string
+			name: applicantInfo['name'] as string,
+			gender: applicantInfo['gender'] as string,
+			parent_name: applicantInfo['parent_name'] as string,
+			parent_phone: applicantInfo['parent_phone'] as string,
+			teacher_name: applicantInfo['teacher_name'] as string,
+			photo_url: (applicantInfo['photo_url'] as string | null) ?? ''
 		},
 		class_info: {
 			college: classInfo['college'] as string,

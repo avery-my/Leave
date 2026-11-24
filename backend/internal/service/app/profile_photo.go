@@ -15,12 +15,13 @@ import (
 
 type profilePhotoImport struct {
 	done chan struct{}
+	path string
 	err  error
 }
 
-func (p *ProfileService) fillMissingPhoto(ctx context.Context, studentID string) error {
-	if p.schoolClient == nil || ctx.Err() != nil {
-		return nil
+func (p *ProfileService) getOrImportPhotoPath(ctx context.Context, studentID string) (string, error) {
+	if ctx.Err() != nil {
+		return "", nil
 	}
 
 	job := &profilePhotoImport{done: make(chan struct{})}
@@ -28,26 +29,29 @@ func (p *ProfileService) fillMissingPhoto(ctx context.Context, studentID string)
 		current := active.(*profilePhotoImport)
 		select {
 		case <-current.done:
-			return current.err
+			return current.path, current.err
 		case <-ctx.Done():
-			return nil
+			return "", nil
 		}
 	}
 	defer func() {
-		p.photoImports.Delete(studentID)
 		close(job.done)
+		p.photoImports.Delete(studentID)
 	}()
-	job.err = p.importMissingPhoto(ctx, studentID)
-	return job.err
+	job.path, job.err = p.findOrImportPhoto(ctx, studentID)
+	return job.path, job.err
 }
 
-func (p *ProfileService) importMissingPhoto(ctx context.Context, studentID string) error {
+func (p *ProfileService) findOrImportPhoto(ctx context.Context, studentID string) (string, error) {
 	profile, err := p.dao.GetProfileByStuID(studentID)
 	if err != nil {
-		return err
+		return "", err
 	}
-	if profile == nil || profile.PhotoPath != "" {
-		return nil
+	if profile == nil {
+		return "", nil
+	}
+	if profile.PhotoPath != "" || p.schoolClient == nil {
+		return profile.PhotoPath, nil
 	}
 
 	const maxAttempts = 5
@@ -57,7 +61,19 @@ func (p *ProfileService) importMissingPhoto(ctx context.Context, studentID strin
 		key, fetchErr := p.schoolClient.FetchStudentPhoto(attemptCtx, studentID)
 		cancel()
 		if fetchErr == nil {
-			return p.persistImportedPhoto(ctx, profile.ID, key)
+			saved, err := p.persistImportedPhoto(ctx, profile.ID, key)
+			if err != nil {
+				return "", err
+			}
+			if saved {
+				return key, nil
+			}
+			// 另一实例已写入时，使用数据库中胜出的路径。
+			current, err := p.dao.GetProfileByStuID(studentID)
+			if err != nil || current == nil {
+				return "", err
+			}
+			return current.PhotoPath, nil
 		}
 		err = fetchErr
 		if errors.Is(err, schoollogin.ErrCaptchaRejected) || errors.Is(err, schoollogin.ErrUpstreamUnavailable) {
@@ -69,12 +85,12 @@ func (p *ProfileService) importMissingPhoto(ctx context.Context, studentID strin
 		}
 	}
 	if ctx.Err() != nil {
-		return nil
+		return "", nil
 	}
-	return err
+	return "", err
 }
 
-func (p *ProfileService) persistImportedPhoto(ctx context.Context, profileID uint, key string) error {
+func (p *ProfileService) persistImportedPhoto(ctx context.Context, profileID uint, key string) (bool, error) {
 	// 此时照片已落盘，即使客户端断开，也要完成写入或清理。
 	const databaseTimeout = 3 * time.Second
 	background := context.WithoutCancel(ctx)
@@ -82,7 +98,7 @@ func (p *ProfileService) persistImportedPhoto(ctx context.Context, profileID uin
 	updated, err := p.dao.UpdateProfilePhotoIfEmpty(writeCtx, profileID, key)
 	cancelWrite()
 	if err == nil && updated {
-		return nil
+		return true, nil
 	}
 	log := p.logger.With(zap.Uint("profile_id", profileID), zap.String("file_key", key))
 	if err != nil {
@@ -92,14 +108,14 @@ func (p *ProfileService) persistImportedPhoto(ctx context.Context, profileID uin
 		cancelCheck()
 		if readErr != nil {
 			log.Warn("核对补录照片路径失败，保留文件", logutil.Error(readErr))
-			return err
+			return false, err
 		}
 		if referenced {
-			return nil
+			return true, nil
 		}
 	}
 	if cleanupErr := file.Delete(p.storage.RootDir, key); cleanupErr != nil {
 		log.Warn("清理补录照片失败", logutil.Error(cleanupErr))
 	}
-	return err
+	return false, err
 }

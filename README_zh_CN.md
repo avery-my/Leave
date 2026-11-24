@@ -102,6 +102,8 @@ App 请求还会校验客户端版本。联调前需准备与 `frontend/manifest
 
 要启用学校照片补录，请在根目录 `.env` 中设置 `SCHOOL_URL` 和 `SCHOOL_PASSWORD`。`SCHOOL_URL` 必须是 HTTPS 根地址。学生在 App 查看自己的假条详情时，如果个人资料缺少照片，后端会使用学号和 OCR 从 School 获取照片。同一后端实例内，同一学生的并发详情请求共用一次补录，补录最多尝试 5 次，仅在验证码错误或过期、网络超时或学校服务临时故障时重试。照片保存在 YAML 配置的 `storage.root_dir` 下的 `photo/` 目录。照片落盘后，即使客户端断开，后端也会继续把相对路径写入 `profiles.photo_path`，或核对文件是否应删除。补录失败时，App 仍会收到假条详情，下次查看时可以再次尝试。
 
+假条详情的头像位置显示已保存的学校照片，无照片或加载失败时显示内置卡通头像。请按[部署说明](deploy/README.md#假条详情照片)配置 App 站点的 Nginx 照片路由。
+
 #### 内部 OCR
 
 通过 `backend/internal/service/common/ocr` 的 `ocr.NewService(logger)` 创建共享实例，再注入使用 OCR 的业务 Service。调用 `ocrService.RecognizeBase64(ctx, imageBase64)`，并在应用退出时关闭实例。输入是 PNG 或 JPEG 的 Base64 或 Data URI，返回识别文本和错误。本地开发时，将工作目录设为 `backend/` 或仓库根目录。模型位于 `backend/assets/ocr/model`。将对应平台的 ONNX Runtime 动态库放入 `backend/assets/ocr/lib`，或通过 `OCR_ONNX_RUNTIME` 指定动态库的绝对路径。

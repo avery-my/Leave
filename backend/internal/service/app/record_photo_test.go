@@ -13,6 +13,7 @@ import (
 
 	"backend/internal/config"
 	"backend/internal/dao/mysql"
+	"backend/internal/dto"
 	"backend/internal/models"
 	"backend/internal/schoollogin"
 	"backend/internal/utils/file"
@@ -53,6 +54,8 @@ func (photoTestConnPool) Commit() error   { return nil }
 func (photoTestConnPool) Rollback() error { return nil }
 
 func TestGetRecordPhotoImport(t *testing.T) {
+	const existingPhoto = "photo/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg"
+	const uploadsURL = "https://example.com/api/v1/uploads"
 	databaseErr := &mysqldriver.MySQLError{Number: 1205, Message: "database write result unknown"}
 	for _, tt := range []struct {
 		name            string
@@ -87,7 +90,9 @@ func TestGetRecordPhotoImport(t *testing.T) {
 		{name: "concurrent requests share successful import", concurrent: true, succeedOn: 1, wantCalls: 1, wantFile: true},
 		{name: "request canceled on second attempt", cancelOn: 2, wantCalls: 2},
 		{name: "request canceled on final attempt", cancelOn: 5, wantCalls: 5},
-		{name: "photo already exists", photoPath: "photo/existing.jpg"},
+		{name: "photo already exists", photoPath: existingPhoto},
+		{name: "existing photo with school disabled", photoPath: existingPhoto, schoolDisabled: true},
+		{name: "ignore paths outside the photo directory", photoPath: "avatars/test.jpg"},
 		{name: "missing profile", missingProfile: true},
 		{name: "school disabled", schoolDisabled: true},
 		{name: "missing record", missingRecord: true},
@@ -108,10 +113,17 @@ func TestGetRecordPhotoImport(t *testing.T) {
 			const profileID = 21
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
-			storage := config.StorageConfig{RootDir: t.TempDir()}
+			storage := config.StorageConfig{
+				RootDir: t.TempDir(),
+				BaseURL: uploadsURL,
+			}
 			var key string
 			var profileReads, photoCalls, writes int
-			var followerDone chan error
+			type detailResult struct {
+				response *dto.RecordResponse
+				err      error
+			}
+			var followerDone chan detailResult
 			var service *RecordService
 			db, err := gorm.Open(gormmysql.New(gormmysql.Config{
 				DSN:                       "tcp(127.0.0.1:1)/isolated_record_photo_test",
@@ -143,7 +155,7 @@ func TestGetRecordPhotoImport(t *testing.T) {
 					*dest = models.Record{ID: recordID, StudentID: studentID}
 				case *models.Profile:
 					profileReads++
-					if writes > 0 {
+					if len(tx.Statement.Vars) > 0 && tx.Statement.Vars[0] == uint(profileID) {
 						if tx.Statement.Vars[0] != uint(profileID) || tx.Statement.Context.Err() != nil ||
 							!strings.Contains(tx.Statement.SQL.String(), "FOR UPDATE") {
 							t.Fatalf("expected an active check for profile %d, got %s %v", profileID, tx.Statement.SQL.String(), tx.Statement.Vars)
@@ -164,7 +176,11 @@ func TestGetRecordPhotoImport(t *testing.T) {
 						tx.AddError(gorm.ErrRecordNotFound)
 						return
 					}
-					*dest = models.Profile{ID: profileID, StudentID: studentID, PhotoPath: tt.photoPath}
+					photoPath := tt.photoPath
+					if writes > 0 && tt.writeSkipped {
+						photoPath = existingPhoto
+					}
+					*dest = models.Profile{ID: profileID, StudentID: studentID, PhotoPath: photoPath}
 				}
 			}); err != nil {
 				t.Fatal(err)
@@ -194,11 +210,11 @@ func TestGetRecordPhotoImport(t *testing.T) {
 				photoCalls++
 				if tt.concurrent && photoCalls == 1 {
 					waiting := make(chan struct{})
-					followerDone = make(chan error, 1)
+					followerDone = make(chan detailResult, 1)
 					go func() {
 						followerCtx := photoImportWaitContext{Context: ctx, waiting: waiting}
-						_, err := service.GetRecord(followerCtx, studentID, recordID)
-						followerDone <- err
+						response, err := service.GetRecord(followerCtx, studentID, recordID)
+						followerDone <- detailResult{response: response, err: err}
 					}()
 					select {
 					case <-waiting:
@@ -258,11 +274,19 @@ func TestGetRecordPhotoImport(t *testing.T) {
 				requester = tt.requestedBy
 			}
 			response, err := service.GetRecord(ctx, requester, recordID)
+			wantPhotoURL := ""
+			switch {
+			case tt.photoPath == existingPhoto || tt.writeSkipped:
+				wantPhotoURL = uploadsURL + "/" + existingPhoto
+			case tt.succeedOn > 0 && (tt.writeErr == nil || tt.photoReferenced):
+				wantPhotoURL = uploadsURL + "/" + key
+			}
 			if followerDone != nil {
 				select {
-				case err := <-followerDone:
-					if err != nil || profileReads != 1 {
-						t.Fatalf("concurrent request did not share the import: %v, profile reads %d", err, profileReads)
+				case result := <-followerDone:
+					if result.err != nil || profileReads != 1 || result.response == nil ||
+						result.response.ApplicantInfo.PhotoURL != wantPhotoURL {
+						t.Fatalf("concurrent request did not share the import: %+v, %v, profile reads %d", result.response, result.err, profileReads)
 					}
 				case <-time.After(time.Second):
 					t.Fatal("concurrent request did not return after the import")
@@ -275,6 +299,8 @@ func TestGetRecordPhotoImport(t *testing.T) {
 				}
 			case err != nil || response == nil || response.ID != recordID:
 				t.Fatalf("unexpected detail response: %+v, %v", response, err)
+			case response.ApplicantInfo.PhotoURL != wantPhotoURL:
+				t.Fatalf("photo URL = %q, want %q", response.ApplicantInfo.PhotoURL, wantPhotoURL)
 			}
 			if photoCalls != tt.wantCalls {
 				t.Fatalf("School calls = %d, want %d", photoCalls, tt.wantCalls)

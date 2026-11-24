@@ -393,6 +393,7 @@ export async function getAdminRecordForDisplay(
 			parent_name: stringValue(data, 'parent_name'),
 			parent_phone: stringValue(data, 'parent_phone'),
 			teacher_name: stringValue(data, 'teacher_name'),
+			photo_url: '',
 		},
 		class_info: {
 			college: stringValue(data, 'college'),

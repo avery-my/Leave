@@ -102,6 +102,8 @@ App requests also check the client version. Prepare published version data match
 
 To enable school photo import, set `SCHOOL_URL` and `SCHOOL_PASSWORD` in the root `.env`. Use an HTTPS root URL for `SCHOOL_URL`. When a student opens their leave record in the app and their profile has no photo, the backend uses their student ID and OCR to fetch the photo from School. Concurrent detail requests for the same student share one import in the same backend instance. Each import makes up to five attempts, with retries limited to rejected or expired captchas and network timeouts or temporary upstream failures. The file is saved under `photo/` inside the YAML-configured `storage.root_dir`, and the backend finishes writing its relative path to `profiles.photo_path` or checking whether to remove the file even if the client disconnects. If import fails, the app still receives the leave record details and can retry by opening them again.
 
+The leave detail page uses the saved school photo in its avatar slots and falls back to the built-in cartoon when the photo is unavailable. Serve the photos from the App site’s Nginx host using the [deployment instructions](deploy/README.md#假条详情照片).
+
 #### Internal OCR
 
 Construct a shared instance with `ocr.NewService(logger)` from `backend/internal/service/common/ocr` and inject it into the consuming service. Call `ocrService.RecognizeBase64(ctx, imageBase64)` and close the instance at shutdown. It accepts a PNG or JPEG as Base64 or a data URI and returns text and an error. For local development, set the working directory to `backend/` or the repository root. Models are in `backend/assets/ocr/model`. Put the platform’s ONNX Runtime library in `backend/assets/ocr/lib` or set `OCR_ONNX_RUNTIME` to its absolute path.

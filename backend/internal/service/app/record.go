@@ -10,6 +10,7 @@ import (
 	"backend/internal/dto"
 	logutil "backend/internal/logger"
 	"backend/internal/models"
+	"backend/internal/utils/file"
 
 	"go.uber.org/zap"
 )
@@ -90,10 +91,21 @@ func (r *RecordService) GetRecord(ctx context.Context, studentID string, recordI
 	if err != nil {
 		return nil, err
 	}
-	if err := r.profile.fillMissingPhoto(ctx, record.StudentID); err != nil {
+	response := toRecordResponse(record)
+	photoPath, err := r.profile.getOrImportPhotoPath(ctx, record.StudentID)
+	if err != nil {
 		r.logger.Warn("补录学生照片失败", zap.Uint("record_id", record.ID), logutil.Error(err))
+		return response, nil
 	}
-	return toRecordResponse(record), nil
+	if strings.HasPrefix(photoPath, "photo/") {
+		photoURL, err := file.AccessURL(r.profile.storage.BaseURL, photoPath)
+		if err != nil {
+			r.logger.Warn("生成学生照片地址失败", zap.Uint("record_id", record.ID), logutil.Error(err))
+		} else {
+			response.ApplicantInfo.PhotoURL = photoURL
+		}
+	}
+	return response, nil
 }
 
 func (r *RecordService) GetRecordsList(studentID string, query dto.RecordListQuery) ([]*dto.RecordListItem, error) {

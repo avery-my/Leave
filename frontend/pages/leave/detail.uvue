@@ -112,6 +112,7 @@ function detailApplication(record: RecordDetail): string {
 	return JSON.stringify({
 		studentName: record.applicant_info.name,
 		gender: record.applicant_info.gender,
+		photoURL: record.applicant_info.photo_url,
 		parentName: record.applicant_info.parent_name,
 		parentPhone: record.applicant_info.parent_phone,
 		teacherName: record.applicant_info.teacher_name,

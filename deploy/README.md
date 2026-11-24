@@ -8,6 +8,15 @@
 
 Android 真机通过 USB 调试时，运行 `make phone` 将设备上的 8080 转发到本机后端。头像服务监听 8081 时也可一并转发。工具和配置步骤见[本地开发说明](../README_zh_CN.md#从源码运行)。
 
+### 假条详情照片
+
+学生自己的假条详情接口 `GET /api/v1/record/:id` 在有学校照片时返回 `applicant_info.photo_url`。App 直接向 Nginx 请求图片，缺少地址或加载失败时显示页面内置的卡通头像。
+
+- 本地使用 [nginx.local.conf](nginx.local.conf) 和端口 8081。将后端 `storage.root_dir` 挂载到容器的 `/www/wwwroot/Leave/uploads`，并将后端 `storage.base_url` 配置为手机可访问的地址，例如 USB 转发时的 `http://127.0.0.1:8081/api/v1/uploads`。
+- 生产环境将 [nginx.app.photo.conf](nginx.app.photo.conf) 合入 `storage.base_url` 对应的 App 域名的 `server` 块，默认是 `leave.mhspace.dpdns.org`。若更改了 URL 前缀或上传目录，同步调整该配置中的路径及 `alias`。确保 Nginx 能读取 `storage.root_dir/photo`，检查 `nginx -t` 后重载并用 App 核验。
+
+照片 URL 使用随机文件名，持有链接即可直接读取。Nginx 禁止目录访问，关闭该路径的访问日志并返回 `Cache-Control: private, no-store`。
+
 ## Windows 本地开发
 
 如果本地开发需要连接远端 MySQL、Redis，可以在项目根目录运行 `make air`，自动建立连接并启动 Air；按 `Ctrl+C` 退出时自动清理连接。直接运行 Air 的方式仍可照常使用。

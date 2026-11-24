@@ -23,6 +23,7 @@ type RecordApplicantInfo struct {
 	ParentName  string `json:"parent_name"`
 	ParentPhone string `json:"parent_phone"`
 	TeacherName string `json:"teacher_name"`
+	PhotoURL    string `json:"photo_url,omitempty"`
 }
 
 // RecordResponse contains all information needed by the leave-record detail view.

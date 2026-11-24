@@ -12242,7 +12242,7 @@ body {
 <div data-v-42af73e1 class=avatar-container>
 <div data-v-42af73e1 class="van-image van-image--round student-avatar">
 <div class=van-image__error>
-<div data-v-42af73e1 class=default-avatar>
+<div data-v-42af73e1 class=default-avatar data-applicant-avatar>
 <svg data-v-e986889e data-v-42af73e1 class="svg-icon gender-icon" aria-hidden=true>
 <use data-v-e986889e xlink:href=#icon-male>
 </use>
@@ -12322,7 +12322,7 @@ body {
 <div data-v-3dee4ac2 class=applicant-info-compact__avatar>
 <div data-v-e0ffa26d data-v-3dee4ac2 class=avatar-wrapper style=width:44px;height:44px>
 <div data-v-e0ffa26d class=avatar-border style=width:48px;height:48px>
-<div data-v-e0ffa26d class="default-avatar male" style=width:44px;height:44px>
+<div data-v-e0ffa26d class="default-avatar male" data-applicant-avatar style=width:44px;height:44px>
 <svg data-v-e986889e data-v-e0ffa26d class="svg-icon avatar-icon" aria-hidden=true>
 <use data-v-e986889e xlink:href=#icon-male>
 </use>
@@ -12496,6 +12496,17 @@ body {
   transform:scale(1.05);
   transform-origin:top center;
 }
+[data-applicant-avatar] {
+  position:relative;
+}
+.applicant-photo {
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  border-radius:50%;
+  object-fit:cover;
+}
 </style>
 <script>
 // 页面由 uvue 容器加载记录详情后，将展示数据作为 application 参数传入。
@@ -12568,6 +12579,20 @@ const avatarIcon = pageData.gender === 'female' ? '#icon-female' : '#icon-male';
 document.querySelectorAll('.gender-icon use, .avatar-icon use').forEach(function (node) {
   node.setAttribute('xlink:href', avatarIcon);
 });
+
+const photoURL = applicationValue('photoURL', '').trim();
+if (/^https?:\/\//i.test(photoURL)) {
+  document.querySelectorAll('[data-applicant-avatar]').forEach(function (avatar) {
+    const photo = new Image();
+    photo.className = 'applicant-photo';
+    photo.alt = '';
+    photo.referrerPolicy = 'no-referrer';
+    photo.addEventListener('load', function () {
+      avatar.appendChild(photo);
+    }, { once: true });
+    photo.src = photoURL;
+  });
+}
 
 // 详情卡片支持独立折叠：收起时箭头由上向下逆时针旋转 180 度。
 document.querySelectorAll('.detail-card .card-header').forEach(function (header) {
