@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -91,9 +92,9 @@ func Load() (Config, error) {
 	if err := v.Unmarshal(&cfg); err != nil {
 		return Config{}, fmt.Errorf("解析配置失败: %w", err)
 	}
-	cfg.School = SchoolConfig{
-		URL:      os.Getenv("SCHOOL_URL"),
-		Password: os.Getenv("SCHOOL_PASSWORD"),
+	cfg.School, err = loadSchoolConfig()
+	if err != nil {
+		return Config{}, err
 	}
 	cfg.Redis.Host = strings.TrimSpace(cfg.Redis.Host)
 	cfg.App.Namespace = strings.TrimSpace(cfg.App.Namespace)
@@ -130,6 +131,27 @@ func Load() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func loadSchoolConfig() (SchoolConfig, error) {
+	school := SchoolConfig{
+		URL:      strings.TrimRight(strings.TrimSpace(os.Getenv("SCHOOL_URL")), "/"),
+		Password: os.Getenv("SCHOOL_PASSWORD"),
+	}
+	if school == (SchoolConfig{}) {
+		return school, nil
+	}
+
+	site, err := url.Parse(school.URL)
+	if err != nil || site.Scheme != "https" ||
+		site.Hostname() == "" || site.User != nil || site.Path != "" ||
+		site.ForceQuery || site.RawQuery != "" || strings.Contains(school.URL, "#") {
+		return SchoolConfig{}, fmt.Errorf("SCHOOL_URL must be an HTTPS root URL")
+	}
+	if school.Password == "" {
+		return SchoolConfig{}, fmt.Errorf("SCHOOL_PASSWORD cannot be empty when SCHOOL_URL is configured")
+	}
+	return school, nil
 }
 
 // FindConfigFile 为服务和迁移工具选择同一个环境配置，不匹配模板或任意 YAML。

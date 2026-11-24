@@ -100,7 +100,7 @@ Windows PowerShell 可使用 `Invoke-RestMethod http://127.0.0.1:8080/api/v1/hea
 
 App 请求还会校验客户端版本。联调前需准备与 `frontend/manifest.json` 对应的已发布版本数据，版本数据与 APK 的准备方式见 [发布说明](deploy/README.md)。
 
-如需在后端获取学校照片，在根目录 `.env` 中设置 `SCHOOL_URL` 和 `SCHOOL_PASSWORD`。用户名和验证码由调用方传入。照片保存在 YAML 配置的 `storage.root_dir` 下的 `photo/` 目录。
+如需在后端获取学校照片，在根目录 `.env` 中设置 `SCHOOL_URL` 和 `SCHOOL_PASSWORD`。`SCHOOL_URL` 必须是 HTTPS 根地址。调用方传入用户名，后端获取验证码并通过 OCR 识别。照片保存在 YAML 配置的 `storage.root_dir` 下的 `photo/` 目录。
 
 #### 内部 OCR
 

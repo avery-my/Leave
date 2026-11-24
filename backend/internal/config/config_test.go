@@ -223,3 +223,36 @@ func TestLoadKeepsIndependentConfiguration(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadSchoolConfig(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		url      string
+		password string
+		wantURL  string
+		wantErr  string
+	}{
+		{name: "optional"},
+		{name: "HTTP", url: "http://school.example.test", password: "test-password", wantErr: "SCHOOL_URL"},
+		{name: "HTTPS", url: " https://school.example.test/ ", password: "test-password", wantURL: "https://school.example.test"},
+		{name: "missing URL", password: "test-password", wantErr: "SCHOOL_URL"},
+		{name: "unsupported scheme", url: "ftp://school.example.test", password: "test-password", wantErr: "SCHOOL_URL"},
+		{name: "URL with path", url: "https://school.example.test/login", password: "test-password", wantErr: "SCHOOL_URL"},
+		{name: "missing password", url: "https://school.example.test", wantErr: "SCHOOL_PASSWORD"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("SCHOOL_URL", tt.url)
+			t.Setenv("SCHOOL_PASSWORD", tt.password)
+			got, err := loadSchoolConfig()
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("expected error for %s, got %v", tt.wantErr, err)
+				}
+				return
+			}
+			if err != nil || got.URL != tt.wantURL || got.Password != tt.password {
+				t.Fatalf("unexpected school configuration or error: %v", err)
+			}
+		})
+	}
+}

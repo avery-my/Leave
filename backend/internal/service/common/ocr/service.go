@@ -1,12 +1,12 @@
 package ocr
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 
 	logutil "backend/internal/logger"
 
@@ -14,23 +14,27 @@ import (
 	"go.uber.org/zap"
 )
 
-// Service 管理一个按需加载的 OCR 引擎。
-type Service struct {
+// OcrService 管理一个按需加载的 OCR 引擎。
+type OcrService struct {
 	logger *zap.Logger
 	engine *paddle.Engine
-	mu     sync.Mutex
+	slot   chan struct{}
 }
 
-func NewService(logger *zap.Logger) *Service {
-	return &Service{
+func NewService(logger *zap.Logger) *OcrService {
+	return &OcrService{
 		logger: logger,
+		slot:   make(chan struct{}, 1),
 	}
 }
 
 // Close 释放已加载的引擎。再次识别时会重新加载。
-func (s *Service) Close() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *OcrService) Close() {
+	if s.slot == nil {
+		return
+	}
+	s.slot <- struct{}{}
+	defer func() { <-s.slot }()
 	if s.engine != nil {
 		s.engine.Destroy()
 		s.engine = nil
@@ -38,15 +42,29 @@ func (s *Service) Close() {
 }
 
 // RecognizeBase64 识别 PNG 或 JPEG 的 Base64 或 Data URI，直接拼接各段识别文本。
-func (s *Service) RecognizeBase64(input string) (string, error) {
+func (s *OcrService) RecognizeBase64(ctx context.Context, input string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if s.slot == nil {
+		return "", fmt.Errorf("OCR 服务未初始化")
+	}
 	img, err := decodeImage(input)
 	if err != nil {
 		return "", err
 	}
 
-	// 首次使用时加载模型，并串行访问同一实例的引擎。
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// 串行访问引擎，等待时允许请求取消。
+	select {
+	case s.slot <- struct{}{}:
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+	defer func() { <-s.slot }()
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+
 	if s.engine == nil {
 		s.engine, err = loadOCREngine()
 		if err != nil {
@@ -59,7 +77,14 @@ func (s *Service) RecognizeBase64(input string) (string, error) {
 		s.logger.Info("OCR 引擎初始化成功", zap.String("operation", "ocr.initialize"))
 	}
 
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	// RunOCR 会同步执行，返回后才能释放引擎。
 	result, err := s.engine.RunOCR(img)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return "", ctxErr
+	}
 	if err != nil {
 		s.logger.Error("OCR 推理失败",
 			zap.String("operation", "ocr.recognize"),

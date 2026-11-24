@@ -100,7 +100,7 @@ In Windows PowerShell, use `Invoke-RestMethod http://127.0.0.1:8080/api/v1/healt
 
 App requests also check the client version. Prepare published version data matching `frontend/manifest.json` before app integration; see the [release guide](deploy/README.md) for version data and APK preparation.
 
-For internal school photo retrieval, set `SCHOOL_URL` and `SCHOOL_PASSWORD` in the root `.env`. The calling service supplies the username and captcha. Photos are saved under `photo/` inside the YAML-configured `storage.root_dir`.
+For internal school photo retrieval, set `SCHOOL_URL` and `SCHOOL_PASSWORD` in the root `.env`. Use an HTTPS root URL for `SCHOOL_URL`. The calling service supplies the username, and the backend fetches the captcha and reads it with OCR. Photos are saved under `photo/` inside the YAML-configured `storage.root_dir`.
 
 #### Internal OCR
 

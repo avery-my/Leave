@@ -15,30 +15,16 @@ import (
 	"backend/internal/config"
 )
 
-func TestNewClientValidatesConfig(t *testing.T) {
-	for _, tt := range []struct {
-		name     string
-		url      string
-		root     string
-		password string
-		want     string
-	}{
-		{name: "missing URL", want: "SCHOOL_URL"},
-		{name: "HTTP", url: "http://school.example.test", want: "HTTPS"},
-		{name: "URL with path", url: "https://school.example.test/login", want: "HTTPS"},
-		{name: "missing password", url: "https://school.example.test", want: "SCHOOL_PASSWORD"},
-		{name: "missing storage root", url: "https://school.example.test", password: "test-password", want: "storage.root_dir"},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewClient(config.SchoolConfig{
-				URL:      tt.url,
-				Password: tt.password,
-			}, tt.root)
-			if err == nil || !strings.Contains(err.Error(), tt.want) {
-				t.Fatalf("NewClient() error = %v, want %s", err, tt.want)
-			}
-		})
+type testCaptchaRecognizer struct {
+	answer string
+	err    error
+}
+
+func (r testCaptchaRecognizer) RecognizeBase64(_ context.Context, input string) (string, error) {
+	if input != "dGVzdA==" {
+		return "", fmt.Errorf("unexpected captcha input: %q", input)
 	}
+	return r.answer, r.err
 }
 
 func TestFetchStudentPhoto(t *testing.T) {
@@ -52,25 +38,34 @@ function _DK() { return "\x70\x3a"; }`
 		t.Fatal(err)
 	}
 
+	ocrFailure := errors.New("test OCR failure")
 	for _, tt := range []struct {
 		name         string
 		status       int
 		blockStorage bool
 		wantError    string
+		ocr          captchaRecognizer
 	}{
 		{name: "saved", status: http.StatusOK},
 		{name: "upstream failure", status: http.StatusBadGateway, wantError: "HTTP 502"},
 		{name: "storage failure", status: http.StatusOK, blockStorage: true, wantError: "保存学校照片"},
+		{name: "OCR failure", ocr: testCaptchaRecognizer{err: ocrFailure}, wantError: "识别学校验证码"},
+		{name: "empty OCR answer", ocr: testCaptchaRecognizer{answer: " "}, wantError: "学校验证码识别结果为空"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			usernames := make(chan string, 2)
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
-				case "/api/sec_js":
+				case "/api/captcha":
 					if _, err := r.Cookie("session"); err == nil {
 						t.Error("unexpected cookie from an earlier call")
 					}
 					http.SetCookie(w, &http.Cookie{Name: "session", Value: "test-session", Path: "/"})
+					fmt.Fprint(w, `{"data":{"id":"captcha-id","base64":"dGVzdA=="}}`)
+				case "/api/sec_js":
+					if tt.ocr != nil {
+						t.Error("login started without a valid captcha answer")
+					}
 					fmt.Fprint(w, script)
 				case "/api/login":
 					if cookie, err := r.Cookie("session"); err != nil || cookie.Value != "test-session" {
@@ -79,6 +74,9 @@ function _DK() { return "\x70\x3a"; }`
 					var request loginRequest
 					if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 						t.Errorf("invalid login request: %v", err)
+					}
+					if request.CID != key.encrypt("captcha-id") || request.Code != key.encrypt("answer") {
+						t.Error("login request did not use the fetched captcha and OCR answer")
 					}
 					usernames <- request.Username
 					fmt.Fprint(w, `{"code":0,"data":{"access_token":"test-token"}}`)
@@ -108,27 +106,39 @@ function _DK() { return "\x70\x3a"; }`
 					t.Fatal(err)
 				}
 			}
-			client, err := NewClient(config.SchoolConfig{
+			recognizer := tt.ocr
+			if recognizer == nil {
+				recognizer = testCaptchaRecognizer{answer: "answer"}
+			}
+			client := NewClient(config.SchoolConfig{
 				URL:      server.URL,
 				Password: "test-password",
-			}, root)
-			if err != nil {
-				t.Fatal(err)
-			}
+			}, root, recognizer)
 			client.transport = server.Client().Transport
 
-			if got, err := client.FetchStudentPhoto(t.Context(), " ", "captcha-id", "answer"); got != "" || err == nil || !strings.Contains(err.Error(), "用户名") {
+			if got, err := client.FetchStudentPhoto(t.Context(), " "); got != "" || err == nil || !strings.Contains(err.Error(), "用户名") {
 				t.Fatalf("expected missing username error, got %q, %v", got, err)
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			if got, err := client.FetchStudentPhoto(ctx, "student", "captcha-id", "answer"); got != "" || !errors.Is(err, context.Canceled) {
+			if got, err := client.FetchStudentPhoto(ctx, "student"); got != "" || !errors.Is(err, context.Canceled) {
 				t.Fatalf("expected context cancellation, got %q, %v", got, err)
+			}
+
+			if tt.ocr != nil {
+				got, err := client.FetchStudentPhoto(t.Context(), "student")
+				if got != "" || err == nil || !strings.Contains(err.Error(), tt.wantError) {
+					t.Fatalf("expected %q and no photo path, got %q, %v", tt.wantError, got, err)
+				}
+				if tt.name == "OCR failure" && !errors.Is(err, ocrFailure) {
+					t.Fatalf("expected wrapped OCR error, got %v", err)
+				}
+				return
 			}
 
 			var previous string
 			for _, username := range []string{"student-one", "student-two"} {
-				got, err := client.FetchStudentPhoto(t.Context(), username, "captcha-id", "answer")
+				got, err := client.FetchStudentPhoto(t.Context(), username)
 				select {
 				case encrypted := <-usernames:
 					if encrypted != key.encrypt(username) {

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
-	"net/url"
 	"strings"
 	"time"
 
@@ -15,57 +14,46 @@ import (
 	"backend/internal/utils/file"
 )
 
+type captchaRecognizer interface {
+	RecognizeBase64(context.Context, string) (string, error)
+}
+
 type Client struct {
 	baseURL     string
 	storageRoot string
 	password    string
 	transport   http.RoundTripper
+	ocr         captchaRecognizer
 }
 
-func NewClient(cfg config.SchoolConfig, storageRoot string) (*Client, error) {
-	baseURL := strings.TrimRight(strings.TrimSpace(cfg.URL), "/")
-	if baseURL == "" {
-		return nil, errors.New("请配置 SCHOOL_URL")
-	}
-	parsed, err := url.Parse(baseURL)
-	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" ||
-		parsed.User != nil || parsed.Path != "" || parsed.ForceQuery || parsed.RawQuery != "" ||
-		strings.Contains(baseURL, "#") {
-		return nil, errors.New("SCHOOL_URL 应为 HTTPS 网站根地址")
-	}
-	if cfg.Password == "" {
-		return nil, errors.New("请配置 SCHOOL_PASSWORD")
-	}
-
-	if strings.TrimSpace(storageRoot) == "" {
-		return nil, errors.New("请配置 storage.root_dir")
-	}
-
+func NewClient(cfg config.SchoolConfig, storageRoot string, ocrService captchaRecognizer) *Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	return &Client{
-		baseURL:     baseURL,
+		baseURL:     cfg.URL,
 		storageRoot: storageRoot,
 		password:    cfg.Password,
 		transport:   transport,
-	}, nil
+		ocr:         ocrService,
+	}
 }
 
 // FetchStudentPhoto 保存指定学校账号的 JPEG 照片，返回相对于上传根目录的路径。
-func (c *Client) FetchStudentPhoto(ctx context.Context, username, captchaID, captchaAnswer string) (string, error) {
+func (c *Client) FetchStudentPhoto(ctx context.Context, username string) (string, error) {
 	username = strings.TrimSpace(username)
 	if username == "" {
 		return "", errors.New("请提供学校用户名")
 	}
-	captchaID = strings.TrimSpace(captchaID)
-	captchaAnswer = strings.TrimSpace(captchaAnswer)
-	if captchaID == "" || captchaAnswer == "" {
-		return "", errors.New("请提供验证码 ID 和答案")
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if c.ocr == nil {
+		return "", errors.New("未配置学校验证码识别服务")
 	}
 
 	jar, err := cookiejar.New(nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("初始化学校登录会话: %w", err)
 	}
 	client := &http.Client{
 		Jar:       jar,
@@ -74,6 +62,23 @@ func (c *Client) FetchStudentPhoto(ctx context.Context, username, captchaID, cap
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
+	}
+
+	captchaID, captchaBase64, err := fetchCaptcha(ctx, client, c.baseURL)
+	if err != nil {
+		return "", err
+	}
+
+	captchaAnswer, err := c.ocr.RecognizeBase64(ctx, captchaBase64)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return "", ctxErr
+	}
+	if err != nil {
+		return "", fmt.Errorf("识别学校验证码: %w", err)
+	}
+	captchaAnswer = strings.TrimSpace(captchaAnswer)
+	if captchaAnswer == "" {
+		return "", errors.New("学校验证码识别结果为空")
 	}
 
 	token, err := login(ctx, client, c.baseURL, username, c.password, captchaID, captchaAnswer)
