@@ -31,8 +31,8 @@ func login(ctx context.Context, client *http.Client, baseURL, username, password
 		return "", fmt.Errorf("获取安全脚本: %w", err)
 	}
 	defer script.Body.Close()
-	if script.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("获取安全脚本失败 (HTTP %d)", script.StatusCode)
+	if err := schoolHTTPError(script.StatusCode, "获取安全脚本"); err != nil {
+		return "", err
 	}
 	source, err := io.ReadAll(io.LimitReader(script.Body, 1<<20))
 	if err != nil {
@@ -64,6 +64,10 @@ func login(ctx context.Context, client *http.Client, baseURL, username, password
 		return "", fmt.Errorf("提交登录: %w", err)
 	}
 	defer resp.Body.Close()
+	statusErr := schoolHTTPError(resp.StatusCode, "登录")
+	if statusErr == ErrUpstreamUnavailable {
+		return "", statusErr
+	}
 	const maxResponseBytes = 1 << 20
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
@@ -81,20 +85,22 @@ func login(ctx context.Context, client *http.Client, baseURL, username, password
 		} `json:"data"`
 	}
 	decodeErr := json.Unmarshal(body, &result)
-	if resp.StatusCode != http.StatusOK || (decodeErr == nil && result.Code != nil && *result.Code != 0) {
-		status := fmt.Sprintf("HTTP %d", resp.StatusCode)
-		if decodeErr == nil && result.Code != nil {
-			status += fmt.Sprintf("，业务码 %d", *result.Code)
-		}
+	if statusErr != nil || (decodeErr == nil && result.Code != nil && *result.Code != 0) {
 		// 只显示可识别的错误原因。响应正文和其他字段可能包含会话信息。
 		if decodeErr == nil {
-			for _, reason := range []string{"参数解码错误", "验证码已过期", "验证码错误", "验证码不正确", "账号或密码错误", "用户名或密码错误"} {
-				if strings.Contains(result.Message, reason) {
-					return "", fmt.Errorf("登录失败 (%s) %s", status, reason)
-				}
+			switch message := result.Message; {
+			case strings.Contains(message, "参数解码错误"):
+				return "", errLoginDecode
+			case strings.Contains(message, "账号或密码错误"), strings.Contains(message, "用户名或密码错误"):
+				return "", errInvalidCredentials
+			case strings.Contains(message, "验证码已过期"), strings.Contains(message, "验证码错误"), strings.Contains(message, "验证码不正确"):
+				return "", ErrCaptchaRejected
+			}
+			if result.Code != nil {
+				return "", fmt.Errorf("登录失败 (HTTP %d，业务码 %d)", resp.StatusCode, *result.Code)
 			}
 		}
-		return "", fmt.Errorf("登录失败 (%s)", status)
+		return "", statusErr
 	}
 	if decodeErr != nil {
 		return "", errors.New("登录接口响应格式异常")

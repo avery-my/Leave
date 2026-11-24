@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"backend/internal/config"
@@ -40,20 +41,31 @@ function _DK() { return "\x70\x3a"; }`
 
 	ocrFailure := errors.New("test OCR failure")
 	for _, tt := range []struct {
-		name         string
-		status       int
-		blockStorage bool
-		wantError    string
-		ocr          captchaRecognizer
+		name                  string
+		status                int
+		blockStorage          bool
+		wantError             string
+		wantSentinel          error
+		loginError            string
+		loginStatus           int
+		ocr                   captchaRecognizer
+		truncateFirstDownload bool
 	}{
 		{name: "saved", status: http.StatusOK},
-		{name: "upstream failure", status: http.StatusBadGateway, wantError: "HTTP 502"},
+		{name: "truncated download can be retried", status: http.StatusOK, truncateFirstDownload: true},
+		{name: "upstream failure", status: http.StatusBadGateway, wantSentinel: ErrUpstreamUnavailable},
+		{name: "photo missing", status: http.StatusNotFound, wantError: "HTTP 404"},
+		{name: "captcha expired", loginError: "验证码已过期", wantSentinel: ErrCaptchaRejected},
+		{name: "invalid credentials", loginError: "账号或密码错误", wantSentinel: errInvalidCredentials},
+		{name: "login unavailable", loginStatus: http.StatusServiceUnavailable, wantSentinel: ErrUpstreamUnavailable},
+		{name: "unknown login error", loginError: "test-token", wantError: "业务码 1"},
 		{name: "storage failure", status: http.StatusOK, blockStorage: true, wantError: "保存学校照片"},
 		{name: "OCR failure", ocr: testCaptchaRecognizer{err: ocrFailure}, wantError: "识别学校验证码"},
 		{name: "empty OCR answer", ocr: testCaptchaRecognizer{answer: " "}, wantError: "学校验证码识别结果为空"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			usernames := make(chan string, 2)
+			var downloadStarted atomic.Bool
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case "/api/captcha":
@@ -79,6 +91,14 @@ function _DK() { return "\x70\x3a"; }`
 						t.Error("login request did not use the fetched captcha and OCR answer")
 					}
 					usernames <- request.Username
+					if tt.loginStatus != 0 {
+						w.WriteHeader(tt.loginStatus)
+						return
+					}
+					if tt.loginError != "" {
+						fmt.Fprintf(w, `{"code":1,"message":%q}`, tt.loginError)
+						return
+					}
 					fmt.Fprint(w, `{"code":0,"data":{"access_token":"test-token"}}`)
 				case "/api/auth/user":
 					if r.Header.Get("Authorization") != "test-token" {
@@ -90,6 +110,11 @@ function _DK() { return "\x70\x3a"; }`
 						t.Error("photo request missing token")
 					}
 					w.Header().Set("Content-Type", "image/jpeg")
+					if tt.truncateFirstDownload && !downloadStarted.Swap(true) {
+						w.Header().Set("Content-Length", fmt.Sprint(len(photo)))
+						fmt.Fprint(w, photo[:len(photo)-1])
+						return
+					}
 					w.WriteHeader(tt.status)
 					fmt.Fprint(w, photo)
 				default:
@@ -137,7 +162,11 @@ function _DK() { return "\x70\x3a"; }`
 			}
 
 			var previous string
-			for _, username := range []string{"student-one", "student-two"} {
+			students := []string{"student-one", "student-two"}
+			if tt.truncateFirstDownload {
+				students[1] = students[0]
+			}
+			for attempt, username := range students {
 				got, err := client.FetchStudentPhoto(t.Context(), username)
 				select {
 				case encrypted := <-usernames:
@@ -148,6 +177,21 @@ function _DK() { return "\x70\x3a"; }`
 					t.Fatalf("login did not run: %v", err)
 				}
 
+				if tt.truncateFirstDownload && attempt == 0 {
+					if got != "" || err != ErrUpstreamUnavailable {
+						t.Fatalf("expected a retryable error and no photo path for a truncated download, got %q, %v", got, err)
+					}
+					if _, err := os.Stat(photoDir); !errors.Is(err, os.ErrNotExist) {
+						t.Fatalf("truncated download should leave no photo directory, got %v", err)
+					}
+					continue
+				}
+				if tt.wantSentinel != nil {
+					if got != "" || err != tt.wantSentinel {
+						t.Fatalf("expected error %v and no photo path, got %q, %v", tt.wantSentinel, got, err)
+					}
+					continue
+				}
 				if tt.wantError != "" {
 					if got != "" || err == nil || !strings.Contains(err.Error(), tt.wantError) || strings.Contains(err.Error(), "test-token") {
 						t.Fatalf("expected %q with no photo path or token, got %q, %v", tt.wantError, got, err)

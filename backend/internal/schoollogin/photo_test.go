@@ -1,6 +1,42 @@
 package schoollogin
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"net/http"
+	"strings"
+	"testing"
+)
+
+type photoTestTransport func(*http.Request) (*http.Response, error)
+
+func (f photoTestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestDownloadPhotoTransportError(t *testing.T) {
+	const token = "test-token"
+	for _, tt := range []struct {
+		name string
+		err  error
+		want error
+	}{
+		{name: "timeout", err: context.DeadlineExceeded, want: context.DeadlineExceeded},
+		{name: "unknown error", err: errors.New("unexpected transport error"), want: errPhotoRequest},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &http.Client{
+				Transport: photoTestTransport(func(_ *http.Request) (*http.Response, error) {
+					return nil, tt.err
+				}),
+			}
+			_, err := downloadPhoto(t.Context(), client, "https://school.example.test", token, "photo-id")
+			if err != tt.want || strings.Contains(err.Error(), token) {
+				t.Fatalf("expected a safe download error %v, got %v", tt.want, err)
+			}
+		})
+	}
+}
 
 func TestParsePhotoID(t *testing.T) {
 	for _, test := range []struct {

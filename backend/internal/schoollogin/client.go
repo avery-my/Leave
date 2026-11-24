@@ -26,6 +26,17 @@ type Client struct {
 	ocr         captchaRecognizer
 }
 
+func schoolHTTPError(status int, operation string) error {
+	switch status {
+	case http.StatusOK:
+		return nil
+	case http.StatusRequestTimeout, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return ErrUpstreamUnavailable
+	default:
+		return fmt.Errorf("%s失败 (HTTP %d)", operation, status)
+	}
+}
+
 func NewClient(cfg config.SchoolConfig, storageRoot string, ocrService captchaRecognizer) *Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil

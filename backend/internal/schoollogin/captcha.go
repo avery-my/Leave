@@ -21,8 +21,8 @@ func fetchCaptcha(ctx context.Context, client *http.Client, baseURL string) (str
 		return "", "", fmt.Errorf("请求验证码: %w", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("获取验证码失败 (HTTP %d)", resp.StatusCode)
+	if err := schoolHTTPError(resp.StatusCode, "获取验证码"); err != nil {
+		return "", "", err
 	}
 
 	type captchaPayload struct {

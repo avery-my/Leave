@@ -3,9 +3,14 @@ package app
 import (
 	"context"
 	"errors"
+	"net"
 	"time"
 
+	logutil "backend/internal/logger"
+	"backend/internal/schoollogin"
 	"backend/internal/utils/file"
+
+	"go.uber.org/zap"
 )
 
 type profilePhotoImport struct {
@@ -47,22 +52,26 @@ func (p *ProfileService) importMissingPhoto(ctx context.Context, studentID strin
 
 	const maxAttempts = 5
 	const attemptTimeout = 10 * time.Second
-	var key string
-	for range maxAttempts {
-		if ctx.Err() != nil {
-			return nil
-		}
+	for attempt := 0; attempt < maxAttempts && ctx.Err() == nil; attempt++ {
 		attemptCtx, cancel := context.WithTimeout(ctx, attemptTimeout)
-		key, err = p.schoolClient.FetchStudentPhoto(attemptCtx, studentID)
+		key, fetchErr := p.schoolClient.FetchStudentPhoto(attemptCtx, studentID)
 		cancel()
-		if err == nil {
+		if fetchErr == nil {
+			return p.persistImportedPhoto(ctx, profile.ID, key)
+		}
+		err = fetchErr
+		if errors.Is(err, schoollogin.ErrCaptchaRejected) || errors.Is(err, schoollogin.ErrUpstreamUnavailable) {
+			continue
+		}
+		var netErr net.Error
+		if !errors.As(err, &netErr) || !netErr.Timeout() {
 			break
 		}
 	}
-	if err != nil {
-		return err
+	if ctx.Err() != nil {
+		return nil
 	}
-	return p.persistImportedPhoto(ctx, profile.ID, key)
+	return err
 }
 
 func (p *ProfileService) persistImportedPhoto(ctx context.Context, profileID uint, key string) error {
@@ -72,18 +81,25 @@ func (p *ProfileService) persistImportedPhoto(ctx context.Context, profileID uin
 	writeCtx, cancelWrite := context.WithTimeout(background, databaseTimeout)
 	updated, err := p.dao.UpdateProfilePhotoIfEmpty(writeCtx, profileID, key)
 	cancelWrite()
+	if err == nil && updated {
+		return nil
+	}
+	log := p.logger.With(zap.Uint("profile_id", profileID), zap.String("file_key", key))
 	if err != nil {
 		// 连接中断时写入可能已经提交，确认路径未入库后再删除照片。
 		checkCtx, cancelCheck := context.WithTimeout(background, databaseTimeout)
 		referenced, readErr := p.dao.ProfileReferencesPhoto(checkCtx, profileID, key)
 		cancelCheck()
-		if readErr != nil || referenced {
-			return errors.Join(err, readErr)
+		if readErr != nil {
+			log.Warn("核对补录照片路径失败，保留文件", logutil.Error(readErr))
+			return err
 		}
-		return errors.Join(err, file.Delete(p.storage.RootDir, key))
+		if referenced {
+			return nil
+		}
 	}
-	if !updated {
-		return file.Delete(p.storage.RootDir, key)
+	if cleanupErr := file.Delete(p.storage.RootDir, key); cleanupErr != nil {
+		log.Warn("清理补录照片失败", logutil.Error(cleanupErr))
 	}
-	return nil
+	return err
 }

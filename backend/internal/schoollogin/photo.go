@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -26,8 +27,8 @@ func fetchPhotoID(ctx context.Context, client *http.Client, baseURL, token strin
 		return "", fmt.Errorf("请求用户资料: %w", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("请求用户资料失败 (HTTP %d)", resp.StatusCode)
+	if err := schoolHTTPError(resp.StatusCode, "请求用户资料"); err != nil {
+		return "", err
 	}
 
 	var result struct {
@@ -39,7 +40,7 @@ func fetchPhotoID(ctx context.Context, client *http.Client, baseURL, token strin
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&result); err != nil {
-		return "", errors.New("用户资料响应格式异常")
+		return "", fmt.Errorf("解析用户资料响应: %w", err)
 	}
 	if result.Code == nil {
 		return "", errors.New("用户资料响应缺少业务状态码")
@@ -89,11 +90,15 @@ func downloadPhoto(ctx context.Context, client *http.Client, baseURL, token, pho
 			return nil, ctx.Err()
 		}
 		// URL 错误包含完整请求地址，查询参数里有令牌。
-		return nil, errors.New("请求照片失败")
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			return nil, context.DeadlineExceeded
+		}
+		return nil, errPhotoRequest
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("下载照片失败 (HTTP %d)", resp.StatusCode)
+	if err := schoolHTTPError(resp.StatusCode, "下载照片"); err != nil {
+		return nil, err
 	}
 	mediaType, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	if err != nil || mediaType != "image/jpeg" {
@@ -103,7 +108,14 @@ func downloadPhoto(ctx context.Context, client *http.Client, baseURL, token, pho
 	const maxPhotoBytes = 20 << 20
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxPhotoBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("读取照片: %w", err)
+		if errors.Is(err, io.ErrUnexpectedEOF) {
+			return nil, ErrUpstreamUnavailable
+		}
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			return nil, context.DeadlineExceeded
+		}
+		return nil, errPhotoRead
 	}
 	if len(data) == 0 || len(data) > maxPhotoBytes {
 		return nil, errors.New("照片大小超出允许范围")
