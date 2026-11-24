@@ -11,6 +11,7 @@ type AppVersionResponse struct {
 type AppVersionUpdate struct {
 	VersionCode         int                  `json:"version_code"`
 	VersionName         string               `json:"version_name"`
+	ReleaseNotes        []string             `json:"release_notes"` // 供尚未升级的 App 使用。
 	ReleaseNotesGrouped *ReleaseNotesGrouped `json:"release_notes_grouped"`
 	UncategorizedNotes  []string             `json:"uncategorized_notes,omitempty"`
 }

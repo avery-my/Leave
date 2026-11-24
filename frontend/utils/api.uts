@@ -391,13 +391,13 @@ export function handleUnauthorized() {
 	uni.reLaunch({ url: '/pages/auth/login' })
 }
 
-function appVersionInfoFromJSON(data: UTSJSONObject, fromStorage: boolean = false): AppVersionInfo {
+function appVersionInfoFromJSON(data: UTSJSONObject): AppVersionInfo {
 	const updatesData = data['updates'] as UTSJSONObject[] | null
 	const updates: AppVersionUpdate[] = []
 	if (updatesData != null) {
 		for (const update of updatesData) {
 			let updateNotes = update['uncategorized_notes'] as string[] | null
-			if (updateNotes == null && fromStorage) {
+			if (updateNotes == null) {
 				updateNotes = update['release_notes'] as string[] | null
 			}
 			const groupedData = update['release_notes_grouped'] as UTSJSONObject | null
@@ -441,7 +441,7 @@ export function getStoredUpdateInfo(): AppVersionInfo | null {
 	try {
 		const data = JSON.parse<UTSJSONObject>(storedValue)
 		if (data == null) return null
-		return appVersionInfoFromJSON(data, true)
+		return appVersionInfoFromJSON(data)
 	} catch (_) {
 		return null
 	}

@@ -46,17 +46,18 @@ func (a *AppVersionService) GetCurrentAppVersion(platform string, currentVersion
 		notes, grouped, parseErr := releasenotes.ParseReleaseNotes(update.ReleaseNotes)
 		if parseErr != nil {
 			a.logger.Warn("Invalid App release notes", zap.Uint64("version_id", update.ID), zap.Error(parseErr))
-			notes = nil
+			notes = []string{}
 		}
-		if grouped != nil {
-			notes = nil
-		}
-		response.Updates = append(response.Updates, dto.AppVersionUpdate{
+		item := dto.AppVersionUpdate{
 			VersionCode:         update.VersionCode,
 			VersionName:         update.VersionName,
-			UncategorizedNotes:  notes,
+			ReleaseNotes:        notes,
 			ReleaseNotesGrouped: grouped,
-		})
+		}
+		if grouped == nil {
+			item.UncategorizedNotes = notes
+		}
+		response.Updates = append(response.Updates, item)
 	}
 	return response, nil
 }

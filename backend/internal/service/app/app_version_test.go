@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"testing"
 
 	"backend/internal/dto"
@@ -19,12 +18,20 @@ func TestAppVersionResponseContracts(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if grouped != nil {
-			notes = nil
+		item := dto.AppVersionUpdate{
+			VersionCode:         17,
+			VersionName:         "1.2.0",
+			ReleaseNotes:        notes,
+			ReleaseNotesGrouped: grouped,
+		}
+		if grouped == nil {
+			item.UncategorizedNotes = notes
 		}
 		version := dto.AppVersionResponse{
-			Platform: "android", LatestVersionCode: 17, LatestVersionName: "1.2.0",
-			Updates: []dto.AppVersionUpdate{{VersionCode: 17, VersionName: "1.2.0", UncategorizedNotes: notes, ReleaseNotesGrouped: grouped}},
+			Platform:          "android",
+			LatestVersionCode: 17,
+			LatestVersionName: "1.2.0",
+			Updates:           []dto.AppVersionUpdate{item},
 		}
 		for _, forced := range []bool{false, true} {
 			recorder := httptest.NewRecorder()
@@ -41,11 +48,11 @@ func TestAppVersionResponseContracts(t *testing.T) {
 			if err := json.Unmarshal(recorder.Body.Bytes(), &wire); err != nil {
 				t.Fatal(err)
 			}
-			if len(wire.Data.Updates) != 1 || !reflect.DeepEqual(wire.Data.Updates[0].UncategorizedNotes, notes) || !reflect.DeepEqual(wire.Data.Updates[0].ReleaseNotesGrouped, grouped) {
+			if len(wire.Data.Updates) != 1 || !reflect.DeepEqual(wire.Data.Updates[0].UncategorizedNotes, item.UncategorizedNotes) || !reflect.DeepEqual(wire.Data.Updates[0].ReleaseNotesGrouped, grouped) {
 				t.Fatalf("forced=%v response lost notes: %s", forced, recorder.Body.String())
 			}
-			if strings.Contains(recorder.Body.String(), `"release_notes":`) {
-				t.Fatalf("forced=%v returned legacy field: %s", forced, recorder.Body.String())
+			if !reflect.DeepEqual(wire.Data.Updates[0].ReleaseNotes, notes) {
+				t.Fatalf("forced=%v response lost legacy notes: %s", forced, recorder.Body.String())
 			}
 			if forced && wire.Code != response.CodeForceUpdate {
 				t.Fatalf("wrong forced update code: %v", wire.Code)
