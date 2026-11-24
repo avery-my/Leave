@@ -5,7 +5,7 @@ go 1.27.4
 require (
 	github.com/getcharzp/go-ocr v0.0.0-20261109083256-9cd886d7dbb0
 	github.com/gin-gonic/gin v1.12.0
-	github.com/go-sql-driver/mysql v1.10.1
+	github.com/go-sql-driver/mysql v1.10.2
 	github.com/redis/go-redis/v9 v9.7.3
 	github.com/spf13/viper v1.21.0
 	github.com/subosito/gotenv v1.6.0
