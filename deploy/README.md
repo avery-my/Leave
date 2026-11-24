@@ -163,6 +163,8 @@ curl --fail -H 'Host: admin.leave.mhspace.dpdns.org' http://127.0.0.1:80/api/v1/
 
 主 CI 不按修改路径跳过，便于提供稳定的合并检查。如果 master 分支规则已有必需检查，合入本次改动后需从实际运行结果中重新选择带 `Backend /`、`Admin /` 前缀的检查，移除旧检查名称。Go 漏洞扫描仍独立运行于 PR、定时和手动事件，因此 PR 页面还可能有一条安全扫描记录；普通 master push 不触发它，也不触发标签部署。
 
+Go 漏洞扫描与后端构建使用 `backend/go.mod` 中的 Go 版本。`govulncheck` 报告可达的 Go 标准库漏洞时，在该文件中升级到包含修复的补丁版本，让扫描、CI 和发布构建统一使用修复后的工具链。
+
 **已知 CI 故障：checkout 改为 SHA 后发布测试报错**
 
 2026-11-07，提交 `52bfcc1` 的 [后端 CI](https://github.com/avery-my/Leave/actions/runs/42366375711) 在 `Test release metadata and shell coordination` 步骤失败。Go 检查与测试已通过；Ruby 的 `test_deploy_checkout_includes_history_and_annotated_tags_before_preparation` 仍精确匹配 `actions/checkout@v5`，而工作流已固定完整 SHA，导致查找返回 nil，在比较步骤顺序时抛出 `NoMethodError: undefined method '<' for nil:NilClass`。后续 Bash 夹具、SQL 测试及 Linux 编译未执行。
