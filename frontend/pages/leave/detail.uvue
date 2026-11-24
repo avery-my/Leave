@@ -21,8 +21,12 @@
 				</view>
 			</view>
 			<!-- 暗色仅作用于原生顶部导航，假条正文保持网页原有配色。 -->
+			<view v-if="isLoading" class="detail-loading">
+				<LoadingSpinner />
+				<text class="detail-loading-text">正在加载假条…</text>
+			</view>
 			<web-view
-				v-if="webSrc != ''"
+				v-else-if="webSrc != ''"
 				id="leave-detail-web-view"
 				class="compare-web-view"
 				:src="webSrc"
@@ -39,15 +43,19 @@ import { ref, nextTick } from 'vue'
 // #ifdef APP-ANDROID
 import WebView from 'android.webkit.WebView'
 // #endif
+import LoadingSpinner from '@/components/LoadingSpinner.uvue'
 import PageTransition from '@/components/PageTransition.uvue'
 import { getRecord, RecordDetail } from '@/utils/api.uts'
 import { getAdminRecordForDisplay, requireAdmin } from '@/utils/admin-api.uts'
 
 const webSrc = ref('')
+const isLoading = ref(true)
 const fromRecords = ref(false)
 let fromAdmin = false
 const isDarkMode = ref(false)
 let isPageVisible = false
+let isUnloaded = false
+let returnTimer = 0
 
 function fixDetailTextZoom() {
 	// #ifdef APP-ANDROID
@@ -79,11 +87,15 @@ syncNavTheme()
 const appThemeChangeId = uni.onAppThemeChange((result: AppThemeChangeResult) => {
 	applyNavTheme(result.appTheme)
 })
+// #endif
 
 onUnload(() => {
+	isUnloaded = true
+	clearTimeout(returnTimer)
+	// #ifdef APP
 	uni.offAppThemeChange(appThemeChangeId)
+	// #endif
 })
-// #endif
 
 onShow(() => {
 	isPageVisible = true
@@ -154,16 +166,23 @@ function returnToPreviousPage() {
 async function loadRecord(id: number) {
 	try {
 		if (fromAdmin && !(await requireAdmin())) return
+		if (isUnloaded) return
 		const record = fromAdmin ? await getAdminRecordForDisplay(id) : await getRecord(id)
+		if (isUnloaded) return
 		webSrc.value = `/static/leave/detail/index.html?application=${encodeURIComponent(detailApplication(record))}`
-		nextTick(() => {
-			fixDetailTextZoom()
-		})
 	} catch (error) {
+		if (isUnloaded) return
 		const message = error instanceof Error ? error.message : '请假记录加载失败'
 		uni.showToast({ title: message == null || message == '' ? '请假记录加载失败' : message, icon: 'none' })
-		setTimeout(returnToPreviousPage, 1200)
+		returnTimer = setTimeout(returnToPreviousPage, 1200)
+		return
+	} finally {
+		if (!isUnloaded) isLoading.value = false
 	}
+
+	nextTick(() => {
+		fixDetailTextZoom()
+	})
 }
 
 onLoad((options) => {
@@ -172,8 +191,9 @@ onLoad((options) => {
 	const idText = options?.id ?? '0'
 	const id = parseInt(idText, 10)
 	if (id <= 0 || Math.floor(id) != id) {
+		isLoading.value = false
 		uni.showToast({ title: '请假记录不存在', icon: 'none' })
-		setTimeout(returnToPreviousPage, 1200)
+		returnTimer = setTimeout(returnToPreviousPage, 1200)
 		return
 	}
 	loadRecord(id)
@@ -291,6 +311,16 @@ onLoad((options) => {
 }
 .compare-web-view {
 	flex:1
+}
+.detail-loading {
+	flex: 1;
+	align-items: center;
+	justify-content: center;
+}
+.detail-loading-text {
+	margin-top: 12px;
+	font-size: 14px;
+	color: #596477;
 }
 .nav-dark-background {
 	background-color: #000;
