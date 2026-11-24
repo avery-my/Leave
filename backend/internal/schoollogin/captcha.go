@@ -26,7 +26,7 @@ func fetchCaptcha(ctx context.Context, client *http.Client, baseURL string) (str
 	}
 
 	type captchaPayload struct {
-		ID     string `json:"id"`
+		CID    string `json:"cid"`
 		Base64 string `json:"base64"`
 	}
 	var result struct {
@@ -48,9 +48,9 @@ func fetchCaptcha(ctx context.Context, client *http.Client, baseURL string) (str
 	if result.Data != nil {
 		captcha = *result.Data
 	}
-	captchaID, captchaBase64 := captcha.ID, captcha.Base64
+	captchaID, captchaBase64 := captcha.CID, captcha.Base64
 	if captchaID == "" || captchaBase64 == "" {
-		return "", "", errors.New("验证码响应缺少 id 或 base64")
+		return "", "", errors.New("验证码响应缺少 cid 或 base64")
 	}
 	return captchaID, captchaBase64, nil
 }

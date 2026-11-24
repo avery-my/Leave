@@ -61,7 +61,7 @@ function _DK() { return "\x70\x3a"; }`
 						t.Error("unexpected cookie from an earlier call")
 					}
 					http.SetCookie(w, &http.Cookie{Name: "session", Value: "test-session", Path: "/"})
-					fmt.Fprint(w, `{"data":{"id":"captcha-id","base64":"dGVzdA=="}}`)
+					fmt.Fprint(w, `{"code":0,"message":"操作成功","data":{"cid":"captcha:test-id","base64":"dGVzdA=="}}`)
 				case "/api/sec_js":
 					if tt.ocr != nil {
 						t.Error("login started without a valid captcha answer")
@@ -75,7 +75,7 @@ function _DK() { return "\x70\x3a"; }`
 					if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 						t.Errorf("invalid login request: %v", err)
 					}
-					if request.CID != key.encrypt("captcha-id") || request.Code != key.encrypt("answer") {
+					if request.CID != key.encrypt("captcha:test-id") || request.Code != key.encrypt("answer") {
 						t.Error("login request did not use the fetched captcha and OCR answer")
 					}
 					usernames <- request.Username
