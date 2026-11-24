@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"backend/internal/config"
 	"backend/internal/dao/mysql"
@@ -24,6 +25,7 @@ type ProfileService struct {
 	dao          *mysql.DAO
 	storage      config.StorageConfig
 	schoolClient StudentPhotoClient
+	photoImports sync.Map // 学号到正在执行的 *profilePhotoImport。
 }
 
 func NewProfileService(dao *mysql.DAO, storage config.StorageConfig, schoolClient StudentPhotoClient, logger *zap.Logger) *ProfileService {

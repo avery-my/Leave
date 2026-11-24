@@ -100,7 +100,7 @@ Windows PowerShell 可使用 `Invoke-RestMethod http://127.0.0.1:8080/api/v1/hea
 
 App 请求还会校验客户端版本。联调前需准备与 `frontend/manifest.json` 对应的已发布版本数据，版本数据与 APK 的准备方式见 [发布说明](deploy/README.md)。
 
-要启用学校照片补录，请在根目录 `.env` 中设置 `SCHOOL_URL` 和 `SCHOOL_PASSWORD`。`SCHOOL_URL` 必须是 HTTPS 根地址。学生在 App 查看自己的假条详情时，如果个人资料缺少照片，后端会使用学号和 OCR 从 School 获取照片。每次详情请求最多尝试 5 次，首次成功后停止。照片保存在 YAML 配置的 `storage.root_dir` 下的 `photo/` 目录，相对路径写入 `profiles.photo_path`。补录失败时，App 仍会收到假条详情，下次查看时可以再次尝试。
+要启用学校照片补录，请在根目录 `.env` 中设置 `SCHOOL_URL` 和 `SCHOOL_PASSWORD`。`SCHOOL_URL` 必须是 HTTPS 根地址。学生在 App 查看自己的假条详情时，如果个人资料缺少照片，后端会使用学号和 OCR 从 School 获取照片。同一后端实例内，同一学生的并发详情请求共用一次补录，每次补录最多尝试 5 次，首次成功后停止。照片保存在 YAML 配置的 `storage.root_dir` 下的 `photo/` 目录。照片落盘后，即使客户端断开，后端也会继续把相对路径写入 `profiles.photo_path`，或核对文件是否应删除。补录失败时，App 仍会收到假条详情，下次查看时可以再次尝试。
 
 #### 内部 OCR
 

@@ -63,6 +63,22 @@ func (s *DAO) UpdateProfilePhotoIfEmpty(ctx context.Context, profileID uint, key
 	return result.RowsAffected > 0, result.Error
 }
 
+func (s *DAO) ProfileReferencesPhoto(ctx context.Context, profileID uint, key string) (bool, error) {
+	var profile models.Profile
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 等待同一行上尚未完成的写入，并读取提交后的路径。
+		return tx.Unscoped().
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("photo_path").
+			First(&profile, profileID).
+			Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return profile.PhotoPath == key, err
+}
+
 func (s *DAO) GetApartmentByID(apartmentID uint) (*models.Apartment, error) {
 	apartment := new(models.Apartment)
 	if err := s.db.Where("id = ?", apartmentID).First(apartment).Error; err != nil {
