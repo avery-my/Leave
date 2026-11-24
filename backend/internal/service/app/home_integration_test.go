@@ -81,7 +81,7 @@ func TestHomeIntegration(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatal(err)
 	}
-	service := NewRecordService(dao, NewProfileService(dao, config.StorageConfig{BaseURL: "https://example.com/api/v1/uploads"}, zap.NewNop()), zap.NewNop())
+	service := NewRecordService(dao, NewProfileService(dao, config.StorageConfig{BaseURL: "https://example.com/api/v1/uploads"}, nil, zap.NewNop()), zap.NewNop())
 	// 与运行环境一致，使用本地北京时间覆盖年初的月份边界。
 	now := time.Date(2026, 1, 1, 0, 30, 0, 0, time.Local)
 	monthStart := time.Date(2026, 1, 1, 0, 0, 0, 0, time.Local)

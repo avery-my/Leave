@@ -27,7 +27,8 @@ type Profile struct {
 	ApartmentID     uint           `gorm:"column:apartment_id"`
 	DormitoryNumber string         `gorm:"column:dormitory_number"`
 	TeacherName     string         `gorm:"column:teacher_name"`
-	AvatarPath      string         `gorm:"column:avatar_path"` // 保存相对路径，访问地址由 Service 拼接。
+	AvatarPath      string         `gorm:"column:avatar_path"`             // 保存相对路径，访问地址由 Service 拼接。
+	PhotoPath       string         `gorm:"column:photo_path;default:null"` // 保存学校照片的相对路径。
 	CreatedAt       time.Time      `gorm:"column:created_at"`
 	UpdatedAt       time.Time      `gorm:"column:updated_at"`
 	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at"`

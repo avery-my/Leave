@@ -8,8 +8,10 @@ import (
 	redisdao "backend/internal/dao/redis"
 	"backend/internal/middleware"
 	"backend/internal/router"
+	"backend/internal/schoollogin"
 	adminservice "backend/internal/service/admin"
 	appservice "backend/internal/service/app"
+	"backend/internal/service/common/ocr"
 	sharedoptions "backend/internal/service/common/options"
 	"backend/internal/session"
 
@@ -18,7 +20,12 @@ import (
 )
 
 // buildDependencies 组装当前应用实例的服务、Handler 和中间件。
-func buildDependencies(cfg config.Config, dao *mysql.DAO, logger *zap.Logger, redisClient *redis.Client) router.Dependencies {
+func buildDependencies(cfg config.Config, dao *mysql.DAO, logger *zap.Logger, redisClient *redis.Client, ocrService *ocr.OcrService) router.Dependencies {
+	var schoolClient appservice.StudentPhotoClient
+	if cfg.School != nil {
+		schoolClient = schoollogin.NewClient(*cfg.School, cfg.Storage.RootDir, ocrService)
+	}
+
 	limiter := middleware.NewRateLimiter(redisClient, logger)
 	tokens := session.NewStore(redisdao.NewDAO(redisClient, cfg.App.Namespace), cfg.Session)
 	commonOptionsService := sharedoptions.NewOptionsService(dao, logger)
@@ -26,7 +33,7 @@ func buildDependencies(cfg config.Config, dao *mysql.DAO, logger *zap.Logger, re
 	appAvatarService := appservice.NewAvatarService(dao, cfg.Storage, logger)
 	appFeedbackService := appservice.NewFeedbackService(dao, cfg.Storage, logger)
 	appOptionsService := appservice.NewOptionsService(dao, commonOptionsService, logger)
-	appProfileService := appservice.NewProfileService(dao, cfg.Storage, logger)
+	appProfileService := appservice.NewProfileService(dao, cfg.Storage, schoolClient, logger)
 	appRecordService := appservice.NewRecordService(dao, appProfileService, logger)
 	appUserService := appservice.NewUserService(dao, tokens, cfg.Storage, logger)
 	adminApartmentService := adminservice.NewApartmentService(dao, logger)

@@ -1,12 +1,14 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
 
 	"backend/internal/dao/mysql"
 	"backend/internal/dto"
+	logutil "backend/internal/logger"
 	"backend/internal/models"
 
 	"go.uber.org/zap"
@@ -83,10 +85,13 @@ func (r *RecordService) CreateRecord(studentID string, request *dto.RecordCreate
 	return toRecordResponse(record), nil
 }
 
-func (r *RecordService) GetRecord(studentID string, recordID int) (*dto.RecordResponse, error) {
+func (r *RecordService) GetRecord(ctx context.Context, studentID string, recordID int) (*dto.RecordResponse, error) {
 	record, err := r.dao.GetRecordByID(studentID, recordID)
 	if err != nil {
 		return nil, err
+	}
+	if err := r.profile.fillMissingPhoto(ctx, record.StudentID); err != nil {
+		r.logger.Warn("补录学生照片失败", zap.Uint("record_id", record.ID), logutil.Error(err))
 	}
 	return toRecordResponse(record), nil
 }

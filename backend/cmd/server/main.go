@@ -19,6 +19,7 @@ import (
 	"backend/internal/dao/redis"
 	"backend/internal/logger"
 	"backend/internal/router"
+	"backend/internal/service/common/ocr"
 
 	"go.uber.org/zap"
 )
@@ -113,7 +114,9 @@ func run() (err error) {
 	appLogger.Info("Redis 初始化成功")
 
 	dao := mysql.NewDAO(db, appLogger)
-	r := router.SetupRouter(buildDependencies(cfg, dao, appLogger, redisClient))
+	ocrService := ocr.NewService(appLogger)
+	defer ocrService.Close()
+	r := router.SetupRouter(buildDependencies(cfg, dao, appLogger, redisClient, ocrService))
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.App.Port),
 		Handler: r,

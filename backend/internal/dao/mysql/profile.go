@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"errors"
 
 	"backend/internal/models"
@@ -52,6 +53,14 @@ func (s *DAO) UpdateProfileAvatar(studentID, key string) error {
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+func (s *DAO) UpdateProfilePhotoIfEmpty(ctx context.Context, profileID uint, key string) (bool, error) {
+	result := s.db.WithContext(ctx).
+		Model(&models.Profile{}).
+		Where("id = ? AND (photo_path IS NULL OR photo_path = '')", profileID).
+		Update("photo_path", key)
+	return result.RowsAffected > 0, result.Error
 }
 
 func (s *DAO) GetApartmentByID(apartmentID uint) (*models.Apartment, error) {

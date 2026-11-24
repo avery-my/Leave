@@ -50,8 +50,12 @@ type SchoolConfig struct {
 	Password string
 }
 
+func (c SchoolConfig) Enabled() bool {
+	return c.URL != "" && c.Password != ""
+}
+
 type Config struct {
-	School  SchoolConfig  `mapstructure:"-"`
+	School  *SchoolConfig `mapstructure:"-"` // nil 表示未配置 School。
 	Session SessionConfig `mapstructure:"session"`
 	Redis   RedisConfig   `mapstructure:"redis"`
 	Log     LogConfig     `mapstructure:"log"`
@@ -102,56 +106,94 @@ func Load() (Config, error) {
 	cfg.Storage.RootDir = strings.TrimSpace(cfg.Storage.RootDir)
 	cfg.Storage.BaseURL = strings.TrimSpace(cfg.Storage.BaseURL)
 
-	if cfg.Redis.Host == "" {
-		return Config{}, fmt.Errorf("redis.host cannot be empty")
+	if err := cfg.validate(); err != nil {
+		return Config{}, err
 	}
-	if cfg.Redis.Port <= 0 || cfg.Redis.Port > 65535 {
-		return Config{}, fmt.Errorf("redis.port must be between 1 and 65535")
-	}
-	if cfg.Redis.DB < 0 {
-		return Config{}, fmt.Errorf("redis.db cannot be negative")
-	}
-	if cfg.Mysql.Password == "" {
-		return Config{}, fmt.Errorf("MySQL password cannot be empty; configure MYSQL_PASSWORD")
-	}
-	if cfg.App.Namespace == "" || strings.ContainsAny(cfg.App.Namespace, ": \t\r\n") {
-		return Config{}, fmt.Errorf("app.namespace must be nonempty and contain no colon or whitespace")
-	}
-	if cfg.Session.StudentTTL <= 0 || cfg.Session.AdminTTL <= 0 {
-		return Config{}, fmt.Errorf("session TTLs must be positive durations")
-	}
-	if cfg.App.Port <= 0 || cfg.App.Port > 65535 {
-		return Config{}, fmt.Errorf("app.port must be between 1 and 65535")
-	}
-	if cfg.Storage.RootDir == "" {
-		return Config{}, fmt.Errorf("storage.root_dir cannot be empty")
-	}
-	if cfg.Storage.BaseURL == "" {
-		return Config{}, fmt.Errorf("storage.base_url cannot be empty")
-	}
-
 	return cfg, nil
 }
 
-func loadSchoolConfig() (SchoolConfig, error) {
+func (c Config) validate() error {
+	if err := c.Redis.validate(); err != nil {
+		return err
+	}
+	if err := c.Mysql.validate(); err != nil {
+		return err
+	}
+	if err := c.App.validate(); err != nil {
+		return err
+	}
+	if err := c.Session.validate(); err != nil {
+		return err
+	}
+	return c.Storage.validate()
+}
+
+func (c RedisConfig) validate() error {
+	if c.Host == "" {
+		return fmt.Errorf("redis.host cannot be empty")
+	}
+	if c.Port <= 0 || c.Port > 65535 {
+		return fmt.Errorf("redis.port must be between 1 and 65535")
+	}
+	if c.DB < 0 {
+		return fmt.Errorf("redis.db cannot be negative")
+	}
+	return nil
+}
+
+func (c MySQLConfig) validate() error {
+	if c.Password == "" {
+		return fmt.Errorf("MySQL password cannot be empty; configure MYSQL_PASSWORD")
+	}
+	return nil
+}
+
+func (c AppConfig) validate() error {
+	if c.Namespace == "" || strings.ContainsAny(c.Namespace, ": \t\r\n") {
+		return fmt.Errorf("app.namespace must be nonempty and contain no colon or whitespace")
+	}
+	if c.Port <= 0 || c.Port > 65535 {
+		return fmt.Errorf("app.port must be between 1 and 65535")
+	}
+	return nil
+}
+
+func (c SessionConfig) validate() error {
+	if c.StudentTTL <= 0 || c.AdminTTL <= 0 {
+		return fmt.Errorf("session TTLs must be positive durations")
+	}
+	return nil
+}
+
+func (c StorageConfig) validate() error {
+	if c.RootDir == "" {
+		return fmt.Errorf("storage.root_dir cannot be empty")
+	}
+	if c.BaseURL == "" {
+		return fmt.Errorf("storage.base_url cannot be empty")
+	}
+	return nil
+}
+
+func loadSchoolConfig() (*SchoolConfig, error) {
 	school := SchoolConfig{
 		URL:      strings.TrimRight(strings.TrimSpace(os.Getenv("SCHOOL_URL")), "/"),
 		Password: os.Getenv("SCHOOL_PASSWORD"),
 	}
 	if school == (SchoolConfig{}) {
-		return school, nil
+		return nil, nil
 	}
 
 	site, err := url.Parse(school.URL)
 	if err != nil || site.Scheme != "https" ||
 		site.Hostname() == "" || site.User != nil || site.Path != "" ||
 		site.ForceQuery || site.RawQuery != "" || strings.Contains(school.URL, "#") {
-		return SchoolConfig{}, fmt.Errorf("SCHOOL_URL must be an HTTPS root URL")
+		return nil, fmt.Errorf("SCHOOL_URL must be an HTTPS root URL")
 	}
-	if school.Password == "" {
-		return SchoolConfig{}, fmt.Errorf("SCHOOL_PASSWORD cannot be empty when SCHOOL_URL is configured")
+	if !school.Enabled() {
+		return nil, fmt.Errorf("SCHOOL_PASSWORD cannot be empty when SCHOOL_URL is configured")
 	}
-	return school, nil
+	return &school, nil
 }
 
 // FindConfigFile 为服务和迁移工具选择同一个环境配置，不匹配模板或任意 YAML。

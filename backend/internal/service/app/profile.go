@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 
 	"backend/internal/config"
@@ -14,17 +15,23 @@ import (
 	"gorm.io/gorm"
 )
 
-type ProfileService struct {
-	logger  *zap.Logger
-	dao     *mysql.DAO
-	storage config.StorageConfig
+type StudentPhotoClient interface {
+	FetchStudentPhoto(context.Context, string) (string, error)
 }
 
-func NewProfileService(dao *mysql.DAO, storage config.StorageConfig, logger *zap.Logger) *ProfileService {
+type ProfileService struct {
+	logger       *zap.Logger
+	dao          *mysql.DAO
+	storage      config.StorageConfig
+	schoolClient StudentPhotoClient
+}
+
+func NewProfileService(dao *mysql.DAO, storage config.StorageConfig, schoolClient StudentPhotoClient, logger *zap.Logger) *ProfileService {
 	return &ProfileService{
-		logger:  logger,
-		dao:     dao,
-		storage: storage,
+		logger:       logger,
+		dao:          dao,
+		storage:      storage,
+		schoolClient: schoolClient,
 	}
 }
 

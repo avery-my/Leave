@@ -76,6 +76,53 @@ func TestAdminManagementIntegration(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	t.Run("profile photo backfill", func(t *testing.T) {
+		for _, clearToEmpty := range []bool{false, true} {
+			studentID := fmt.Sprintf("photo-test-%t", clearToEmpty)
+			profile := &models.Profile{StudentID: studentID, Name: "学生"}
+			if err := db.Create(profile).Error; err != nil {
+				t.Fatal(err)
+			}
+			if clearToEmpty {
+				if err := db.Model(profile).Update("photo_path", "").Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			before, err := dao.GetProfileByStuID(studentID)
+			if err != nil || before == nil || before.PhotoPath != "" {
+				t.Fatalf("missing photo did not load as an empty path: %+v, %v", before, err)
+			}
+			type writeResult struct {
+				key     string
+				updated bool
+				err     error
+			}
+			results := make(chan writeResult, 2)
+			for _, key := range []string{"photo/a.jpg", "photo/b.jpg"} {
+				go func() {
+					updated, err := dao.UpdateProfilePhotoIfEmpty(t.Context(), profile.ID, key)
+					results <- writeResult{key: key, updated: updated, err: err}
+				}()
+			}
+			first, second := <-results, <-results
+			if first.err != nil || second.err != nil || first.updated == second.updated {
+				t.Fatalf("expected one winning update: %+v, %+v", first, second)
+			}
+			winner := second.key
+			if first.updated {
+				winner = first.key
+			}
+			if err := dao.Transaction(func(tx *gorm.DB) error {
+				return dao.SaveAppProfile(tx, &models.Profile{StudentID: studentID, Name: "新名字"})
+			}); err != nil {
+				t.Fatal(err)
+			}
+			current, err := dao.GetProfileByStuID(studentID)
+			if err != nil || current == nil || current.PhotoPath != winner || current.Name != "新名字" {
+				t.Fatalf("profile edit should retain winning path %s: %+v, %v", winner, current, err)
+			}
+		}
+	})
 	t.Run("app versions", func(t *testing.T) {
 		if _, err := dao.GetCurrentAppVersion("android"); !errors.Is(err, ErrorAppVersionNotFound) {
 			t.Fatalf("empty current: %v", err)

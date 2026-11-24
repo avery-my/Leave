@@ -25,7 +25,7 @@ func testDependencies(t *testing.T, dao *mysql.DAO, settings config.Config) Depe
 	appAvatarService := appservice.NewAvatarService(dao, settings.Storage, zap.NewNop())
 	appFeedbackService := appservice.NewFeedbackService(dao, settings.Storage, zap.NewNop())
 	appOptionsService := appservice.NewOptionsService(dao, commonOptionsService, zap.NewNop())
-	appProfileService := appservice.NewProfileService(dao, settings.Storage, zap.NewNop())
+	appProfileService := appservice.NewProfileService(dao, settings.Storage, nil, zap.NewNop())
 	appRecordService := appservice.NewRecordService(dao, appProfileService, zap.NewNop())
 	appUserService := appservice.NewUserService(dao, tokens, settings.Storage, zap.NewNop())
 	adminApartmentService := adminservice.NewApartmentService(dao, zap.NewNop())

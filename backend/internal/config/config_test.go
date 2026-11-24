@@ -100,7 +100,7 @@ func TestInitReadsTestConfig(t *testing.T) {
 	if cfg.Mysql.Database != "leave_list_test" || cfg.App.Port != 9000 {
 		t.Fatalf("wrong test configuration: database=%q port=%d", cfg.Mysql.Database, cfg.App.Port)
 	}
-	if cfg.School != (SchoolConfig{}) {
+	if cfg.School != nil {
 		t.Fatal("school configuration should come only from the environment")
 	}
 }
@@ -142,7 +142,7 @@ func TestInitFromReleaseDirectory(t *testing.T) {
 				URL:      "https://school.example.test",
 				Password: "school-test-password",
 			}
-			if cfg.School != wantSchool {
+			if cfg.School == nil || *cfg.School != wantSchool {
 				t.Fatal("release directory did not load school configuration from root .env")
 			}
 		})
@@ -245,13 +245,22 @@ func TestLoadSchoolConfig(t *testing.T) {
 			t.Setenv("SCHOOL_PASSWORD", tt.password)
 			got, err := loadSchoolConfig()
 			if tt.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				if got != nil || err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("expected error for %s, got %v", tt.wantErr, err)
 				}
 				return
 			}
-			if err != nil || got.URL != tt.wantURL || got.Password != tt.password {
-				t.Fatalf("unexpected school configuration or error: %v", err)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tt.wantURL == "" {
+				if got != nil {
+					t.Fatal("unconfigured School must be absent")
+				}
+				return
+			}
+			if got == nil || got.URL != tt.wantURL || got.Password != tt.password || !got.Enabled() {
+				t.Fatal("expected complete School configuration")
 			}
 		})
 	}

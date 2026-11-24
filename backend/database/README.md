@@ -33,7 +33,7 @@ tables/app_versions.sql
 
 `profiles.avatar_path` 和 `profiles.photo_path` 保存相对于上传目录的文件路径，分别使用 `avatars/` 和 `photo/` 子目录。迁移 `000015` 将 `avatar_url` 重命名为 `avatar_path`，保留已有头像路径。部署时需同步切换后端的列映射和查询。
 
-`photo_path` 默认为 `NULL`，表示本人照片尚未导入。已有学生首次查看假条详情时，可根据申请人的 `records.student_id` 找到对应资料，缺少照片时触发补录。新学生首次完成个人资料后触发导入。照片文件保存成功后回填 `profiles.photo_path`，同一学生的假条共用该路径。外站登录凭据不写入这些业务表。
+`photo_path` 默认为 `NULL`。学生在 App 查看自己的假条详情时，后端按 `records.student_id` 查找资料。当路径为 `NULL` 或空字符串且已配置 School 时，同步补录照片，每次请求最多尝试 5 次，首次成功后停止。照片文件保存成功后，仅在路径仍为空时回填 `profiles.photo_path`，同一学生的假条共用该路径。补录失败时仍返回详情，下次查看可以再次尝试。外站登录凭据不写入这些业务表。
 
 ### `seed/`
 

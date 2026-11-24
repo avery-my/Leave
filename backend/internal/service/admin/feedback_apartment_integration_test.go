@@ -122,7 +122,7 @@ func TestFeedbackApartmentIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	profileInput := dto.ProfileRequest{ClassID: class.ID, ApartmentID: row.ID, Gender: models.GenderMale}
-	profileService := appservice.NewProfileService(dao, settings.Storage, zap.NewNop())
+	profileService := appservice.NewProfileService(dao, settings.Storage, nil, zap.NewNop())
 	if err := profileService.Profile(&profileInput, "new-disabled"); !errors.Is(err, appservice.ErrorInvalidProfileReference) {
 		t.Fatalf("new disabled: %v", err)
 	}

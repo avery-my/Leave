@@ -100,7 +100,7 @@ In Windows PowerShell, use `Invoke-RestMethod http://127.0.0.1:8080/api/v1/healt
 
 App requests also check the client version. Prepare published version data matching `frontend/manifest.json` before app integration; see the [release guide](deploy/README.md) for version data and APK preparation.
 
-For internal school photo retrieval, set `SCHOOL_URL` and `SCHOOL_PASSWORD` in the root `.env`. Use an HTTPS root URL for `SCHOOL_URL`. The calling service supplies the username, and the backend fetches the captcha and reads it with OCR. Photos are saved under `photo/` inside the YAML-configured `storage.root_dir`.
+To enable school photo import, set `SCHOOL_URL` and `SCHOOL_PASSWORD` in the root `.env`. Use an HTTPS root URL for `SCHOOL_URL`. When a student opens their leave record in the app and their profile has no photo, the backend uses their student ID and OCR to fetch the photo from School. The detail request makes up to five attempts, stopping at the first success. The file is saved under `photo/` inside the YAML-configured `storage.root_dir`, and its relative path is stored in `profiles.photo_path`. If import fails, the app still receives the leave record details and can retry by opening them again.
 
 #### Internal OCR
 

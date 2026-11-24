@@ -77,7 +77,7 @@ func (r *RecordHandler) GetRecordHandler(c *gin.Context) {
 		return
 	}
 
-	record, err := r.record.GetRecord(studentID, recordID)
+	record, err := r.record.GetRecord(c.Request.Context(), studentID, recordID)
 	if err != nil {
 		if errors.Is(err, mysql.ErrorRecordNotExist) {
 			response.Error(c, response.CodeRecordNotExist)
