@@ -1,5 +1,5 @@
 backend:
-  version: 9
+  version: 10
 
 admin:
   version: 5
@@ -8,11 +8,9 @@ app:
   android:
     apk_directory: deploy/releases
     release_notes:
-      features: []
+      features:
+        - 假条详情新增个人照片展示。暂时没有照片或照片加载失败时，仍显示卡通头像
       improvements:
-        - 优化版本更新页面，版本信息和更新内容更清晰
-        - 更新内容分类展示，最近的更新排在前面，查阅更方便
-        - 调整更新页面的深色配色，夜间查看更舒适
-      bug_fixes:
-        - 修复请假审批时间检查不完整的问题，避免提交不合理的时间
+        - 优化假条详情的查看体验
+      bug_fixes: []
       notices: []
