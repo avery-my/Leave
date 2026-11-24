@@ -104,7 +104,7 @@ For internal school photo retrieval, set `SCHOOL_URL` and `SCHOOL_PASSWORD` in t
 
 #### Internal OCR
 
-Construct a shared instance with `ocr.NewService(logger)` from `backend/internal/service/common/ocr` and inject it into the consuming service. Call `ocrService.RecognizeBase64(imageBase64)` and close the instance at shutdown. It accepts a PNG or JPEG as Base64 or a data URI and returns text and an error. For local development, set the working directory to `backend/` or the repository root. Models are in `backend/assets/ocr/model`. Put the platform’s ONNX Runtime library in `backend/assets/ocr/lib` or set `OCR_ONNX_RUNTIME` to its absolute path.
+Construct a shared instance with `ocr.NewService(logger)` from `backend/internal/service/common/ocr` and inject it into the consuming service. Call `ocrService.RecognizeBase64(ctx, imageBase64)` and close the instance at shutdown. It accepts a PNG or JPEG as Base64 or a data URI and returns text and an error. For local development, set the working directory to `backend/` or the repository root. Models are in `backend/assets/ocr/model`. Put the platform’s ONNX Runtime library in `backend/assets/ocr/lib` or set `OCR_ONNX_RUNTIME` to its absolute path.
 
 ### Web admin
 
